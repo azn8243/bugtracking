@@ -1,20 +1,19 @@
 import React from 'react';
-import { Issue, IssueType, IssueStatus } from '@/types'; // Import types
+import { Link } from 'react-router-dom'; // Import Link
+import { Issue, IssueType, IssueStatus } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Trash2, FileDown, ChevronRight, ChevronDown, ListPlus } from 'lucide-react'; // Import icons
+import { PlusCircle, Trash2, FileDown, ChevronRight, ChevronDown, ListPlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MoreHorizontal } from 'lucide-react';
 
-// Define options arrays here or pass them as props if they become dynamic
 const issueTypes: IssueType[] = ['Bug', 'Task', 'Story', 'Epic'];
 const issueStatuses: IssueStatus[] = ['ToDo', 'InProgress', 'Done', 'Blocked'];
 
@@ -23,11 +22,12 @@ interface IssueListProps {
   projectId: string | null;
   workspaceName: string | null;
   projectName: string | null;
-  onAddIssue: () => void; // For single add dialog
-  onAddBulkIssues: () => void; // For bulk add dialog
-  onDeleteIssue: (id: string) => void;
+  onAddIssue: () => void;
+  onAddBulkIssues: () => void;
+  // Update signature to match what Index provides (only type/status)
+  onUpdateIssue: (id: string, updates: Partial<Pick<Issue, 'type' | 'status'>>) => void;
+  onDeleteIssue: (id: string) => void; // Changed to requestDeleteIssue in Index, just needs ID here
   onExportIssues: (format: 'csv') => void;
-  onUpdateIssue: (id: string, field: 'type' | 'status', value: IssueType | IssueStatus) => void; // Add update handler
 }
 
 const IssueList: React.FC<IssueListProps> = ({
@@ -36,10 +36,10 @@ const IssueList: React.FC<IssueListProps> = ({
     workspaceName,
     projectName,
     onAddIssue,
-    onAddBulkIssues, // Destructure bulk add handler
+    onAddBulkIssues,
+    onUpdateIssue, // Receive the specific update handler
     onDeleteIssue,
-    onExportIssues,
-    onUpdateIssue // Destructure update handler
+    onExportIssues
 }) => {
   if (!projectId) {
     return (
@@ -57,11 +57,11 @@ const IssueList: React.FC<IssueListProps> = ({
   const filteredIssues = issues.filter(issue => issue.projectId === projectId);
 
   const handleTypeChange = (issueId: string, newType: string) => {
-    onUpdateIssue(issueId, 'type', newType as IssueType);
+    onUpdateIssue(issueId, { type: newType as IssueType }); // Use the passed handler
   };
 
   const handleStatusChange = (issueId: string, newStatus: string) => {
-     onUpdateIssue(issueId, 'status', newStatus as IssueStatus);
+     onUpdateIssue(issueId, { status: newStatus as IssueStatus }); // Use the passed handler
   };
 
 
@@ -81,7 +81,6 @@ const IssueList: React.FC<IssueListProps> = ({
             <Button onClick={() => onExportIssues('csv')} variant="outline" size="sm" disabled={filteredIssues.length === 0}>
                 <FileDown className="mr-2 h-4 w-4" /> Export CSV
             </Button>
-            {/* Add Issue Dropdown */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button size="sm">
@@ -115,8 +114,8 @@ const IssueList: React.FC<IssueListProps> = ({
               <TableRow>
                 <TableHead className="w-[80px]">ID</TableHead>
                 <TableHead>Title</TableHead>
-                <TableHead className="w-[130px]">Type</TableHead> {/* Increased width */}
-                <TableHead className="w-[150px]">Status</TableHead> {/* Increased width */}
+                <TableHead className="w-[130px]">Type</TableHead>
+                <TableHead className="w-[150px]">Status</TableHead>
                 <TableHead className="w-[120px]">Created</TableHead>
                 <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
@@ -125,8 +124,12 @@ const IssueList: React.FC<IssueListProps> = ({
               {filteredIssues.map((issue) => (
                 <TableRow key={issue.id}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{issue.id.substring(0, 6)}</TableCell>
-                  <TableCell className="font-medium">{issue.title}</TableCell>
-                  {/* Inline Type Select */}
+                  {/* Wrap title in Link */}
+                  <TableCell className="font-medium">
+                    <Link to={`/issue/${issue.id}`} className="hover:underline hover:text-primary">
+                        {issue.title}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                      <Select value={issue.type} onValueChange={(newType) => handleTypeChange(issue.id, newType)}>
                         <SelectTrigger className="h-8 text-xs px-2 py-1">
@@ -141,7 +144,6 @@ const IssueList: React.FC<IssueListProps> = ({
                         </SelectContent>
                      </Select>
                   </TableCell>
-                  {/* Inline Status Select */}
                   <TableCell>
                      <Select value={issue.status} onValueChange={(newStatus) => handleStatusChange(issue.id, newStatus)}>
                         <SelectTrigger className="h-8 text-xs px-2 py-1">
@@ -167,7 +169,7 @@ const IssueList: React.FC<IssueListProps> = ({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                                onClick={() => onDeleteIssue(issue.id)}
+                                onClick={() => onDeleteIssue(issue.id)} // Call prop directly
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
                             >
                                 <Trash2 className="mr-2 h-4 w-4" />

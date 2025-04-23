@@ -1,56 +1,85 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
 import AddIssueDialog from '@/components/AddIssueDialog';
 import BulkAddIssuesDialog from '@/components/BulkAddIssuesDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
-import { Workspace, Project, Issue, IssueType, IssueStatus, Attachment } from '@/types'; // Import Attachment
-import { v4 as uuidv4 } from 'uuid';
+import { Workspace, Project, Issue, IssueType, IssueStatus } from '@/types';
 import { toast } from "sonner";
-import * as XLSX from 'xlsx';
 
-// Sample Data - Add empty attachments array for consistency
-const initialWorkspaces: Workspace[] = [
-  { id: 'ws1', name: 'Personal Workspace' },
-  { id: 'ws2', name: 'Team Alpha' },
-];
-const initialProjects: Project[] = [
-  { id: 'proj1', name: 'Bug Tracker App', workspaceId: 'ws1' },
-  { id: 'proj2', name: 'Website Redesign', workspaceId: 'ws1' },
-  { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
-];
-const initialIssues: Issue[] = [
-  { id: uuidv4(), title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
-  { id: uuidv4(), title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
-  { id: uuidv4(), title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
-  { id: uuidv4(), title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), attachments: [] },
-  { id: uuidv4(), title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), attachments: [] },
-];
-
+// Type for managing confirmation dialog state (local to Index)
 type DeletionTarget =
   | { type: 'workspace'; id: string; name: string }
   | { type: 'project'; id: string; name: string }
   | { type: 'issue'; id: string; name: string }
   | null;
 
+// Props interface matching handlers passed from App.tsx
+interface IndexProps {
+  workspaces: Workspace[];
+  projects: Project[];
+  issues: Issue[];
+  onAddWorkspace: (name: string) => Workspace;
+  onAddProject: (name: string, workspaceId: string) => Project;
+  onDeleteWorkspace: (id: string, name: string) => void;
+  onDeleteProject: (id: string, name: string) => void;
+  onAddIssue: (newIssueData: Omit<Issue, 'id' | 'createdAt'>) => void;
+  onAddBulkIssues: (titles: string[], projectId: string, workspaceId: string) => void;
+  // Update signature to match what IssueList needs (only type/status)
+  onUpdateIssue: (id: string, updates: Partial<Pick<Issue, 'type' | 'status'>>) => void;
+  onDeleteIssue: (id: string, name: string) => void;
+  onExportIssues: (format: 'csv', projectId: string) => void;
+}
 
-const Index: React.FC = () => {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [issues, setIssues] = useState<Issue[]>(initialIssues);
-
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(initialWorkspaces[0]?.id ?? null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-      const firstProjectInFirstWorkspace = initialProjects.find(p => p.workspaceId === initialWorkspaces[0]?.id);
-      return firstProjectInFirstWorkspace?.id ?? null;
-  });
-
+const Index: React.FC<IndexProps> = ({
+  workspaces,
+  projects,
+  issues,
+  onAddWorkspace,
+  onAddProject,
+  onDeleteWorkspace,
+  onDeleteProject,
+  onAddIssue,
+  onAddBulkIssues,
+  onUpdateIssue, // Receive the specific update handler for list view
+  onDeleteIssue,
+  onExportIssues,
+}) => {
+  // --- Local State for UI ---
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isAddIssueDialogOpen, setIsAddIssueDialogOpen] = useState(false);
   const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
   const [deletionTarget, setDeletionTarget] = useState<DeletionTarget>(null);
 
-  // --- Derived State for Names ---
+  // --- Initialize Selection ---
+  useEffect(() => {
+    // Set initial workspace selection only if not already set and workspaces exist
+    if (!selectedWorkspaceId && workspaces.length > 0) {
+      const initialWsId = workspaces[0].id;
+      setSelectedWorkspaceId(initialWsId);
+      // Set initial project based on the first workspace
+      const firstProjectInWs = projects.find(p => p.workspaceId === initialWsId);
+      setSelectedProjectId(firstProjectInWs?.id ?? null);
+    }
+     // If selected workspace is deleted, reset selection
+     else if (selectedWorkspaceId && !workspaces.find(ws => ws.id === selectedWorkspaceId)) {
+        const nextWorkspace = workspaces[0];
+        setSelectedWorkspaceId(nextWorkspace?.id ?? null);
+        const firstProjectInNextWs = projects.find(p => p.workspaceId === nextWorkspace?.id);
+        setSelectedProjectId(firstProjectInNextWs?.id ?? null);
+     }
+     // If selected project is deleted or workspace changed, reset project selection
+     else if (selectedProjectId && (!projects.find(p => p.id === selectedProjectId) || projects.find(p => p.id === selectedProjectId)?.workspaceId !== selectedWorkspaceId)) {
+        const firstProjectInCurrentWs = projects.find(p => p.workspaceId === selectedWorkspaceId);
+        setSelectedProjectId(firstProjectInCurrentWs?.id ?? null);
+     }
+
+  }, [workspaces, projects, selectedWorkspaceId, selectedProjectId]); // Re-run on data changes
+
+
+  // --- Derived State for Names (using props) ---
   const selectedWorkspaceName = useMemo(() => {
     return workspaces.find(ws => ws.id === selectedWorkspaceId)?.name ?? null;
   }, [workspaces, selectedWorkspaceId]);
@@ -59,100 +88,45 @@ const Index: React.FC = () => {
     return projects.find(p => p.id === selectedProjectId)?.name ?? null;
   }, [projects, selectedProjectId]);
 
-  // --- Selection Handlers ---
+  // --- Selection Handlers (Local State) ---
   const handleSelectWorkspace = useCallback((id: string) => {
     setSelectedWorkspaceId(id);
+    // Reset project selection when workspace changes, select first project in new workspace
     const firstProjectInWorkspace = projects.find(p => p.workspaceId === id);
     setSelectedProjectId(firstProjectInWorkspace?.id ?? null);
-  }, [projects]);
+  }, [projects]); // Depend only on projects
 
   const handleSelectProject = useCallback((id: string) => {
     setSelectedProjectId(id);
   }, []);
 
-  // --- Add Handlers ---
-  const handleAddWorkspace = () => {
+  // --- Add Handlers (Call props, manage local selection) ---
+  const handleLocalAddWorkspace = () => {
     const newWorkspaceName = prompt("Enter new workspace name:");
     if (newWorkspaceName?.trim()) {
-        const newWorkspace: Workspace = { id: uuidv4(), name: newWorkspaceName.trim() };
-        setWorkspaces(prev => [...prev, newWorkspace]);
-        setSelectedWorkspaceId(newWorkspace.id);
-        setSelectedProjectId(null);
-        toast.success(`Workspace "${newWorkspace.name}" created.`);
+        const newWorkspace = onAddWorkspace(newWorkspaceName.trim()); // Call prop handler
+        setSelectedWorkspaceId(newWorkspace.id); // Update local selection
+        setSelectedProjectId(null); // Reset project selection
     } else if (newWorkspaceName !== null) {
         toast.error("Workspace name cannot be empty.");
     }
   };
 
-  const handleAddProject = () => {
+  const handleLocalAddProject = () => {
     if (!selectedWorkspaceId) {
         toast.error("Please select a workspace first.");
         return;
     }
     const newProjectName = prompt("Enter new project name:");
      if (newProjectName?.trim()) {
-        const newProject: Project = { id: uuidv4(), name: newProjectName.trim(), workspaceId: selectedWorkspaceId };
-        setProjects(prev => [...prev, newProject]);
-        setSelectedProjectId(newProject.id);
-        toast.success(`Project "${newProject.name}" created.`);
+        const newProject = onAddProject(newProjectName.trim(), selectedWorkspaceId); // Call prop handler
+        setSelectedProjectId(newProject.id); // Update local selection
     } else if (newProjectName !== null) {
         toast.error("Project name cannot be empty.");
     }
   };
 
-  // Single Issue Add - Now includes attachments
-  const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
-     if (!selectedProjectId || !selectedWorkspaceId) {
-        console.error("Cannot add issue without selected project and workspace");
-        toast.error("Internal error: Project or Workspace not selected.");
-        return;
-    }
-    const newIssue: Issue = {
-      ...newIssueData, // Spread the data including title, description, type, status, attachments?
-      id: uuidv4(),
-      createdAt: new Date(),
-      projectId: selectedProjectId,
-      workspaceId: selectedWorkspaceId,
-      // Ensure attachments is at least an empty array if not provided
-      attachments: newIssueData.attachments ?? [],
-    };
-    setIssues(prev => [...prev, newIssue]);
-    // Toast is handled in the dialog
-  };
-
-  // Bulk Issue Add - Default attachments to empty array
-  const handleAddBulkIssues = (titles: string[]) => {
-     if (!selectedProjectId || !selectedWorkspaceId) {
-        console.error("Cannot add bulk issues without selected project and workspace");
-        toast.error("Internal error: Project or Workspace not selected.");
-        return;
-    }
-    const newIssues: Issue[] = titles.map(title => ({
-        id: uuidv4(),
-        title: title,
-        description: '',
-        type: 'Task',
-        status: 'ToDo',
-        projectId: selectedProjectId!,
-        workspaceId: selectedWorkspaceId!,
-        createdAt: new Date(),
-        attachments: [], // Default to empty array for bulk add
-    }));
-    setIssues(prev => [...prev, ...newIssues]);
-    // Toast is handled in the dialog
-  };
-
-  // --- Update Handler ---
-  const handleUpdateIssue = (id: string, field: 'type' | 'status', value: IssueType | IssueStatus) => {
-    setIssues(prevIssues =>
-        prevIssues.map(issue =>
-            issue.id === id ? { ...issue, [field]: value } : issue
-        )
-    );
-  };
-
-
-  // --- Delete Handlers ---
+  // --- Delete Handlers (Setup confirmation, call props) ---
   const requestDeleteWorkspace = (id: string) => {
     const workspace = workspaces.find(ws => ws.id === id);
     if (workspace) {
@@ -178,63 +152,51 @@ const Index: React.FC = () => {
     if (!deletionTarget) return;
     const { type, id, name } = deletionTarget;
 
+    // Call the appropriate handler from props
     if (type === 'workspace') {
-        const projectsToDelete = projects.filter(p => p.workspaceId === id).map(p => p.id);
-        setIssues(prev => prev.filter(i => !projectsToDelete.includes(i.projectId)));
-        setProjects(prev => prev.filter(p => p.workspaceId !== id));
-        setWorkspaces(prev => prev.filter(ws => ws.id !== id));
-        toast.success(`Workspace "${name}" and its contents deleted.`);
-        if (selectedWorkspaceId === id) {
-            const nextWorkspace = workspaces.find(ws => ws.id !== id);
-            setSelectedWorkspaceId(nextWorkspace?.id ?? null);
-            const firstProjectInNextWorkspace = projects.find(p => p.workspaceId === nextWorkspace?.id);
-            setSelectedProjectId(firstProjectInNextWorkspace?.id ?? null);
-        }
+        onDeleteWorkspace(id, name);
+        // Selection reset is handled by useEffect now
     } else if (type === 'project') {
-        setIssues(prev => prev.filter(i => i.projectId !== id));
-        setProjects(prev => prev.filter(p => p.id !== id));
-        toast.success(`Project "${name}" and its issues deleted.`);
-        if (selectedProjectId === id) {
-             setSelectedProjectId(null);
-        }
+        onDeleteProject(id, name);
+         // Selection reset is handled by useEffect now
     } else if (type === 'issue') {
-        setIssues(prev => prev.filter(i => i.id !== id));
-        toast.success(`Issue "${name}" deleted.`);
+        onDeleteIssue(id, name); // Call prop handler
     }
-    setDeletionTarget(null);
+    setDeletionTarget(null); // Close dialog
   };
 
-  // --- Export Handler ---
-  const handleExportIssues = (format: 'csv') => {
-    if (!selectedProjectId || !selectedProjectName) {
-        toast.error("Please select a project to export issues.");
+  // --- Issue Add Handlers (Call props) ---
+   const handleLocalAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
+     if (!selectedProjectId || !selectedWorkspaceId) {
+        toast.error("Cannot add issue: Project or Workspace not selected.");
         return;
     }
-    const issuesToExport = issues
-        .filter(issue => issue.projectId === selectedProjectId)
-        .map(issue => ({
-            ID: issue.id,
-            Title: issue.title,
-            Description: issue.description ?? '',
-            Type: issue.type,
-            Status: issue.status,
-            Created: issue.createdAt.toISOString(),
-            Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '', // Add attachment names
-        }));
-    if (issuesToExport.length === 0) {
-        toast.info("No issues to export in this project.");
+     // Add the necessary IDs before calling the prop handler
+     onAddIssue({ ...newIssueData, projectId: selectedProjectId, workspaceId: selectedWorkspaceId });
+   };
+
+   const handleLocalAddBulkIssues = (titles: string[]) => {
+      if (!selectedProjectId || !selectedWorkspaceId) {
+        toast.error("Cannot add bulk issues: Project or Workspace not selected.");
         return;
     }
-    if (format === 'csv') {
-        const worksheet = XLSX.utils.json_to_sheet(issuesToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Issues");
-        const dateStr = new Date().toISOString().split('T')[0];
-        const filename = `${selectedProjectName.replace(/ /g, '_')}_Issues_${dateStr}.xlsx`;
-        XLSX.writeFile(workbook, filename);
-        toast.success(`Issues exported to ${filename}`);
-    }
-  };
+      onAddBulkIssues(titles, selectedProjectId, selectedWorkspaceId);
+   };
+
+   // --- Export Handler (Call props) ---
+   const handleLocalExportIssues = (format: 'csv') => {
+     if (!selectedProjectId) {
+        toast.error("Please select a project to export.");
+        return;
+     }
+     onExportIssues(format, selectedProjectId);
+   };
+
+   // --- Update Handler (Call props) ---
+   // This function now directly matches the prop signature needed by IssueList
+   const handleLocalUpdateIssue = (id: string, updates: Partial<Pick<Issue, 'type' | 'status'>>) => {
+       onUpdateIssue(id, updates);
+   };
 
 
   // --- Render ---
@@ -246,10 +208,10 @@ const Index: React.FC = () => {
       selectedProjectId={selectedProjectId}
       onSelectWorkspace={handleSelectWorkspace}
       onSelectProject={handleSelectProject}
-      onAddWorkspace={handleAddWorkspace}
-      onAddProject={handleAddProject}
-      onDeleteWorkspace={requestDeleteWorkspace}
-      onDeleteProject={requestDeleteProject}
+      onAddWorkspace={handleLocalAddWorkspace} // Use local handlers
+      onAddProject={handleLocalAddProject}     // Use local handlers
+      onDeleteWorkspace={requestDeleteWorkspace} // Use local request handlers
+      onDeleteProject={requestDeleteProject}     // Use local request handlers
     />
   );
 
@@ -261,9 +223,9 @@ const Index: React.FC = () => {
         projectName={selectedProjectName}
         onAddIssue={() => setIsAddIssueDialogOpen(true)}
         onAddBulkIssues={() => setIsBulkAddDialogOpen(true)}
-        onDeleteIssue={requestDeleteIssue}
-        onExportIssues={handleExportIssues}
-        onUpdateIssue={handleUpdateIssue}
+        onDeleteIssue={requestDeleteIssue} // Use local request handler
+        onExportIssues={handleLocalExportIssues} // Use local handler
+        onUpdateIssue={handleLocalUpdateIssue} // Pass the correctly scoped update handler
     />
   );
 
@@ -272,26 +234,24 @@ const Index: React.FC = () => {
         <Layout sidebar={sidebarContent}>
             {mainContent}
         </Layout>
-        {/* Single Add Dialog */}
+        {/* Dialogs remain controlled by local state */}
         <AddIssueDialog
             isOpen={isAddIssueDialogOpen}
             onOpenChange={setIsAddIssueDialogOpen}
-            onAddIssue={handleAddIssue}
+            onAddIssue={handleLocalAddIssue} // Use local handler
             projectId={selectedProjectId}
             workspaceId={selectedWorkspaceId}
         />
-        {/* Bulk Add Dialog */}
         <BulkAddIssuesDialog
             isOpen={isBulkAddDialogOpen}
             onOpenChange={setIsBulkAddDialogOpen}
-            onAddBulkIssues={handleAddBulkIssues}
+            onAddBulkIssues={handleLocalAddBulkIssues} // Use local handler
             projectId={selectedProjectId}
         />
-        {/* Confirmation Dialog */}
         <ConfirmationDialog
             isOpen={!!deletionTarget}
             onOpenChange={(open) => !open && setDeletionTarget(null)}
-            onConfirm={confirmDeletion}
+            onConfirm={confirmDeletion} // Calls prop handlers internally
             title={`Delete ${deletionTarget?.type ?? ''}?`}
             description={
                 deletionTarget?.type === 'workspace'
