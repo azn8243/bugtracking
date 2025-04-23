@@ -4,8 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import IssueDetail from "./pages/IssueDetail";
-import NotFound from "./pages/NotFound";
+import IssueDetail from "./pages/IssueDetail"; // Import new page
+import NotFound from "./pages/NotFound";     // Import NotFound page
 import { Workspace, Project, Issue, IssueType, IssueStatus, Attachment } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
@@ -51,32 +51,37 @@ const App = () => {
     const newWorkspace: Workspace = { id: uuidv4(), name };
     setWorkspaces(prev => [...prev, newWorkspace]);
     toast.success(`Workspace "${name}" created.`);
-    return newWorkspace;
+    return newWorkspace; // Return the new workspace for potential immediate selection
   };
 
   const handleAddProject = (name: string, workspaceId: string) => {
     const newProject: Project = { id: uuidv4(), name, workspaceId };
     setProjects(prev => [...prev, newProject]);
     toast.success(`Project "${name}" created.`);
-    return newProject;
+    return newProject; // Return the new project for potential immediate selection
   };
 
   const handleDeleteWorkspace = (id: string, name: string) => {
+    // Cascade delete: remove workspace, its projects, and their issues
     const projectsToDelete = projects.filter(p => p.workspaceId === id).map(p => p.id);
     setIssues(prev => prev.filter(i => !projectsToDelete.includes(i.projectId)));
     setProjects(prev => prev.filter(p => p.workspaceId !== id));
     setWorkspaces(prev => prev.filter(ws => ws.id !== id));
     toast.success(`Workspace "${name}" and its contents deleted.`);
+    // Note: Selection reset logic will now live within the Index component
   };
 
   const handleDeleteProject = (id: string, name: string) => {
+    // Cascade delete: remove project and its issues
     setIssues(prev => prev.filter(i => i.projectId !== id));
     setProjects(prev => prev.filter(p => p.id !== id));
     toast.success(`Project "${name}" and its issues deleted.`);
+     // Note: Selection reset logic will now live within the Index component
   };
 
   // Issue Add/Update/Delete
    const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt'>) => {
+    // Ensure projectId and workspaceId are present before adding
     if (!newIssueData.projectId || !newIssueData.workspaceId) {
         toast.error("Cannot add issue without Project and Workspace ID.");
         console.error("Missing projectId or workspaceId", newIssueData);
@@ -86,7 +91,7 @@ const App = () => {
       ...newIssueData,
       id: `issue-${uuidv4()}`, // Ensure unique ID format
       createdAt: new Date(),
-      attachments: newIssueData.attachments ?? [],
+      attachments: newIssueData.attachments ?? [], // Ensure attachments is an array
     };
     setIssues(prev => [...prev, newIssue]);
     // Toast is handled in the dialog usually
@@ -96,19 +101,19 @@ const App = () => {
     const newIssues: Issue[] = titles.map(title => ({
         id: `issue-${uuidv4()}`, // Ensure unique ID format
         title: title,
-        description: '',
-        type: 'Task',
-        status: 'ToDo',
+        description: '', // Default empty description
+        type: 'Task',    // Default type
+        status: 'ToDo',  // Default status
         projectId: projectId,
         workspaceId: workspaceId,
         createdAt: new Date(),
-        attachments: [],
+        attachments: [], // Default to empty array
     }));
     setIssues(prev => [...prev, ...newIssues]);
     toast.success(`${titles.length} issue(s) added successfully!`);
   };
 
-  // Combined update function
+  // Combined update function for various fields
   const handleUpdateIssue = (id: string, updates: Partial<Pick<Issue, 'title' | 'description' | 'type' | 'status'>>) => {
     setIssues(prevIssues =>
         prevIssues.map(issue =>
@@ -126,7 +131,8 @@ const App = () => {
 
   // Attachment Handlers
   const handleAddAttachment = (issueId: string, file: File) => {
-     if (file.size > 10 * 1024 * 1024) { // 10MB limit
+     // Basic size check (e.g., 10MB limit) - adjust as needed
+     if (file.size > 10 * 1024 * 1024) {
         toast.error(`File "${file.name}" is too large (max 10MB).`);
         return;
      }
@@ -135,7 +141,7 @@ const App = () => {
         name: file.name,
         size: file.size,
         type: file.type,
-        file: file,
+        file: file, // Store the File object (for local state demo)
      };
      setIssues(prevIssues =>
         prevIssues.map(issue =>
@@ -168,28 +174,32 @@ const App = () => {
     }
     const issuesToExport = issues
         .filter(issue => issue.projectId === projectId)
-        .map(issue => ({
+        .map(issue => ({ // Select and format data for export
             ID: issue.id,
             Title: issue.title,
             Description: issue.description ?? '',
             Type: issue.type,
             Status: issue.status,
-            Created: issue.createdAt.toISOString(),
-            Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '',
+            Created: issue.createdAt.toISOString(), // Use ISO string for consistency
+            Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '', // Add attachment names
         }));
+
     if (issuesToExport.length === 0) {
         toast.info("No issues to export in this project.");
         return;
     }
+
     if (format === 'csv') {
         const worksheet = XLSX.utils.json_to_sheet(issuesToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Issues");
-        const dateStr = new Date().toISOString().split('T')[0];
+        // Generate filename: ProjectName_Issues_Date.xlsx
+        const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const filename = `${project.name.replace(/ /g, '_')}_Issues_${dateStr}.xlsx`;
         XLSX.writeFile(workbook, filename);
         toast.success(`Issues exported to ${filename}`);
     }
+    // Add other formats (PDF, Word) here later if needed
   };
 
 
@@ -234,7 +244,7 @@ const App = () => {
                  />
               }
             />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<NotFound />} /> {/* Catch-all route */}
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
