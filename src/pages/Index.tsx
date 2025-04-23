@@ -1,64 +1,144 @@
-import { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Layout from '@/components/Layout';
-import WorkspaceProjectSelector from '@/components/WorkspaceProjectSelector';
+import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
-import { AppData, Workspace, Project, Issue } from '@/types'; // Assuming types are defined
-import { Button } from '@/components/ui/button'; // Example import
+import AddIssueDialog from '@/components/AddIssueDialog';
+import { Workspace, Project, Issue } from '@/types';
+import { v4 as uuidv4 } from 'uuid'; // Need to install uuid
+import { toast } from "sonner";
 
-// Mock Data - Replace with actual data fetching/state management later
-const initialData: AppData = {
-  workspaces: [
-    { id: 'ws1', name: 'My Software Co', createdAt: new Date() },
-    { id: 'ws2', name: 'Personal Projects', createdAt: new Date() },
-  ],
-  projects: [
-    { id: 'proj1', name: 'Frontend App', workspaceId: 'ws1', createdAt: new Date() },
-    { id: 'proj2', name: 'Backend API', workspaceId: 'ws1', createdAt: new Date() },
-    { id: 'proj3', name: 'Blog Site', workspaceId: 'ws2', createdAt: new Date() },
-  ],
-  issues: [
-    { id: 'bug-001', title: 'Login button unresponsive', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date() },
-    { id: 'story-001', title: 'User Authentication Flow', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date() },
-    { id: 'task-001', title: 'Implement JWT validation', type: 'Task', status: 'ToDo', projectId: 'proj2', workspaceId: 'ws1', parentId: 'story-001', createdAt: new Date(), updatedAt: new Date() },
-    { id: 'epic-001', title: 'Q3 Feature Release', type: 'Epic', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date() },
-     { id: 'bug-002', title: 'Typo on landing page', type: 'Bug', status: 'Done', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), updatedAt: new Date() },
-  ],
-};
+// Sample Data
+const initialWorkspaces: Workspace[] = [
+  { id: 'ws1', name: 'Personal Workspace' },
+  { id: 'ws2', name: 'Team Alpha' },
+];
+
+const initialProjects: Project[] = [
+  { id: 'proj1', name: 'Bug Tracker App', workspaceId: 'ws1' },
+  { id: 'proj2', name: 'Website Redesign', workspaceId: 'ws1' },
+  { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
+];
+
+const initialIssues: Issue[] = [
+  { id: uuidv4(), title: 'Button not working on login page', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Implement user authentication', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Design new landing page mockups', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Setup database schema', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
+  { id: uuidv4(), title: 'Define API endpoints for user profiles', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
+];
 
 
-const Index = () => {
-  const [appData, setAppData] = useState<AppData>(initialData); // Manage state here for now
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+const Index: React.FC = () => {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [issues, setIssues] = useState<Issue[]>(initialIssues);
 
-  const handleProjectSelect = (projectId: string | null) => {
-    setSelectedProjectId(projectId);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(initialWorkspaces[0]?.id ?? null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
+      // Set initial project based on initial workspace
+      const firstProjectInFirstWorkspace = initialProjects.find(p => p.workspaceId === initialWorkspaces[0]?.id);
+      return firstProjectInFirstWorkspace?.id ?? null;
+  });
+
+  const [isAddIssueDialogOpen, setIsAddIssueDialogOpen] = useState(false);
+
+  const handleSelectWorkspace = useCallback((id: string) => {
+    setSelectedWorkspaceId(id);
+    // Reset project selection when workspace changes, select first project in new workspace
+    const firstProjectInWorkspace = projects.find(p => p.workspaceId === id);
+    setSelectedProjectId(firstProjectInWorkspace?.id ?? null);
+  }, [projects]);
+
+  const handleSelectProject = useCallback((id: string) => {
+    setSelectedProjectId(id);
+  }, []);
+
+  // --- Placeholder Add Functions ---
+  const handleAddWorkspace = () => {
+    const newWorkspaceName = prompt("Enter new workspace name:");
+    if (newWorkspaceName?.trim()) {
+        const newWorkspace: Workspace = { id: uuidv4(), name: newWorkspaceName.trim() };
+        setWorkspaces(prev => [...prev, newWorkspace]);
+        setSelectedWorkspaceId(newWorkspace.id); // Select the new workspace
+        setSelectedProjectId(null); // Reset project selection
+        toast.success(`Workspace "${newWorkspace.name}" created.`);
+    } else if (newWorkspaceName !== null) { // Handle empty input but not cancel
+        toast.error("Workspace name cannot be empty.");
+    }
   };
 
-  const handleAddIssue = () => {
-    // TODO: Implement logic to open an "Add Issue" dialog/form
-    console.log("Add Issue button clicked for project:", selectedProjectId);
-    alert("Add Issue functionality not yet implemented.");
+  const handleAddProject = () => {
+    if (!selectedWorkspaceId) {
+        toast.error("Please select a workspace first.");
+        return;
+    }
+    const newProjectName = prompt("Enter new project name:");
+     if (newProjectName?.trim()) {
+        const newProject: Project = { id: uuidv4(), name: newProjectName.trim(), workspaceId: selectedWorkspaceId };
+        setProjects(prev => [...prev, newProject]);
+        setSelectedProjectId(newProject.id); // Select the new project
+        toast.success(`Project "${newProject.name}" created.`);
+    } else if (newProjectName !== null) {
+        toast.error("Project name cannot be empty.");
+    }
   };
+  // --- End Placeholder Add Functions ---
+
+  const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
+     if (!selectedProjectId || !selectedWorkspaceId) {
+        console.error("Cannot add issue without selected project and workspace");
+        toast.error("Internal error: Project or Workspace not selected.");
+        return; // Should not happen if dialog is opened correctly
+    }
+    const newIssue: Issue = {
+      ...newIssueData,
+      id: uuidv4(),
+      createdAt: new Date(),
+      projectId: selectedProjectId,
+      workspaceId: selectedWorkspaceId,
+    };
+    setIssues(prev => [...prev, newIssue]);
+    // Toast is handled in the dialog component
+  };
+
 
   const sidebarContent = (
-    <WorkspaceProjectSelector
-      workspaces={appData.workspaces}
-      projects={appData.projects}
-      onProjectSelect={handleProjectSelect}
+    <Sidebar
+      workspaces={workspaces}
+      projects={projects}
+      selectedWorkspaceId={selectedWorkspaceId}
+      selectedProjectId={selectedProjectId}
+      onSelectWorkspace={handleSelectWorkspace}
+      onSelectProject={handleSelectProject}
+      onAddWorkspace={handleAddWorkspace}
+      onAddProject={handleAddProject}
     />
   );
 
-  return (
-    <Layout sidebar={sidebarContent}>
-      <div className="w-full">
+  const mainContent = (
+    <div className="w-full h-full flex flex-col">
         <IssueList
-          issues={appData.issues}
-          projectId={selectedProjectId}
-          onAddIssue={handleAddIssue}
+            issues={issues}
+            projectId={selectedProjectId}
+            onAddIssue={() => setIsAddIssueDialogOpen(true)} // Open dialog on button click
         />
-        {/* We will add the AddIssueDialog component here later */}
-      </div>
-    </Layout>
+        {/* Add other main content components here */}
+    </div>
+  );
+
+  return (
+    <>
+        <Layout sidebar={sidebarContent}>
+            {mainContent}
+        </Layout>
+        <AddIssueDialog
+            isOpen={isAddIssueDialogOpen}
+            onOpenChange={setIsAddIssueDialogOpen}
+            onAddIssue={handleAddIssue}
+            projectId={selectedProjectId}
+            workspaceId={selectedWorkspaceId}
+        />
+    </>
   );
 };
 
