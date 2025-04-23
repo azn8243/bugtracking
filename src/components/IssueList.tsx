@@ -9,43 +9,60 @@ import { PlusCircle } from 'lucide-react';
 interface IssueListProps {
   issues: Issue[];
   projectId: string | null;
-  onAddIssue: () => void; // Function to trigger adding a new issue
+  onAddIssue: () => void;
 }
 
 const IssueList: React.FC<IssueListProps> = ({ issues, projectId, onAddIssue }) => {
   if (!projectId) {
-    return <div className="text-center text-gray-500">Please select a project to view issues.</div>;
+    return (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm bg-background">
+            <div className="flex flex-col items-center gap-1 text-center">
+                <h3 className="text-2xl font-bold tracking-tight">No Project Selected</h3>
+                <p className="text-sm text-muted-foreground">
+                    Select a project from the sidebar to view its issues.
+                </p>
+            </div>
+        </div>
+    );
   }
 
   const filteredIssues = issues.filter(issue => issue.projectId === projectId);
 
   return (
-    <Card className="w-full">
+    // Use flex-1 to fill available space in the layout panel
+    <Card className="w-full flex-1 flex flex-col">
        <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Issues</CardTitle>
         <Button onClick={onAddIssue} size="sm">
           <PlusCircle className="mr-2 h-4 w-4" /> Add Issue
         </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 overflow-auto"> {/* Allow content to scroll */}
         {filteredIssues.length === 0 ? (
-          <p className="text-center text-gray-500">No issues found for this project.</p>
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-full">
+             <div className="flex flex-col items-center gap-1 text-center">
+                <h3 className="text-2xl font-bold tracking-tight">No Issues Yet</h3>
+                <p className="text-sm text-muted-foreground">
+                    Click "Add Issue" to create the first issue for this project.
+                </p>
+             </div>
+          </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
+                <TableHead className="w-[80px]">ID</TableHead>
                 <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead className="w-[100px]">Type</TableHead>
+                <TableHead className="w-[120px]">Status</TableHead>
+                <TableHead className="w-[120px]">Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredIssues.map((issue) => (
                 <TableRow key={issue.id}>
-                  <TableCell className="font-medium">{issue.id.substring(0, 6)}...</TableCell>
-                  <TableCell>{issue.title}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{issue.id.substring(0, 6)}</TableCell>
+                  <TableCell className="font-medium">{issue.title}</TableCell>
                   <TableCell>
                     <Badge variant={
                       issue.type === 'Epic' ? 'destructive' :
@@ -62,7 +79,7 @@ const IssueList: React.FC<IssueListProps> = ({ issues, projectId, onAddIssue }) 
                       'destructive' // Blocked
                     }>{issue.status}</Badge>
                   </TableCell>
-                  <TableCell>{issue.createdAt.toLocaleDateString()}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{issue.createdAt.toLocaleDateString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

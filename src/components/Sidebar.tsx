@@ -12,8 +12,8 @@ interface SidebarProps {
   selectedProjectId: string | null;
   onSelectWorkspace: (id: string) => void;
   onSelectProject: (id: string) => void;
-  onAddWorkspace: () => void; // Placeholder for adding workspace
-  onAddProject: () => void;   // Placeholder for adding project
+  onAddWorkspace: () => void;
+  onAddProject: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -30,16 +30,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   const filteredProjects = projects.filter(p => p.workspaceId === selectedWorkspaceId);
 
   return (
-    <div className="flex flex-col h-full w-full space-y-4">
-      {/* Workspace Selection */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+    // Removed h-full, let the panel handle height
+    <div className="flex flex-col w-full space-y-4">
+      {/* Workspace Selection - Removed Card border/shadow if desired, using panel background */}
+      <Card className="border-none shadow-none bg-transparent">
+        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 px-2 pt-0">
            <CardTitle className="text-sm font-medium">Workspace</CardTitle>
-           <Button variant="ghost" size="sm" onClick={onAddWorkspace} className="p-1 h-auto">
+           <Button variant="ghost" size="sm" onClick={onAddWorkspace} className="p-1 h-auto text-muted-foreground hover:text-foreground">
              <PlusCircle className="h-4 w-4" />
            </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2">
            <Select onValueChange={onSelectWorkspace} value={selectedWorkspaceId ?? undefined}>
             <SelectTrigger>
               <SelectValue placeholder="Select Workspace" />
@@ -58,14 +59,14 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Project Selection */}
       {selectedWorkspaceId && (
-         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+         <Card className="border-none shadow-none bg-transparent">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 px-2 pt-0">
             <CardTitle className="text-sm font-medium">Project</CardTitle>
-             <Button variant="ghost" size="sm" onClick={onAddProject} className="p-1 h-auto" disabled={!selectedWorkspaceId}>
+             <Button variant="ghost" size="sm" onClick={onAddProject} className="p-1 h-auto text-muted-foreground hover:text-foreground" disabled={!selectedWorkspaceId}>
                 <PlusCircle className="h-4 w-4" />
              </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-2">
             <Select onValueChange={onSelectProject} value={selectedProjectId ?? undefined} disabled={!selectedWorkspaceId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select Project" />
@@ -81,8 +82,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           </CardContent>
         </Card>
       )}
-
-      {/* Add more navigation or actions here if needed */}
     </div>
   );
 };

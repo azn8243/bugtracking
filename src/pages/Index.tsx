@@ -4,21 +4,19 @@ import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
 import AddIssueDialog from '@/components/AddIssueDialog';
 import { Workspace, Project, Issue } from '@/types';
-import { v4 as uuidv4 } from 'uuid'; // Need to install uuid
+import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 
-// Sample Data
+// Sample Data (keep as is)
 const initialWorkspaces: Workspace[] = [
   { id: 'ws1', name: 'Personal Workspace' },
   { id: 'ws2', name: 'Team Alpha' },
 ];
-
 const initialProjects: Project[] = [
   { id: 'proj1', name: 'Bug Tracker App', workspaceId: 'ws1' },
   { id: 'proj2', name: 'Website Redesign', workspaceId: 'ws1' },
   { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
 ];
-
 const initialIssues: Issue[] = [
   { id: uuidv4(), title: 'Button not working on login page', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
   { id: uuidv4(), title: 'Implement user authentication', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
@@ -35,7 +33,6 @@ const Index: React.FC = () => {
 
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(initialWorkspaces[0]?.id ?? null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-      // Set initial project based on initial workspace
       const firstProjectInFirstWorkspace = initialProjects.find(p => p.workspaceId === initialWorkspaces[0]?.id);
       return firstProjectInFirstWorkspace?.id ?? null;
   });
@@ -44,7 +41,6 @@ const Index: React.FC = () => {
 
   const handleSelectWorkspace = useCallback((id: string) => {
     setSelectedWorkspaceId(id);
-    // Reset project selection when workspace changes, select first project in new workspace
     const firstProjectInWorkspace = projects.find(p => p.workspaceId === id);
     setSelectedProjectId(firstProjectInWorkspace?.id ?? null);
   }, [projects]);
@@ -53,16 +49,15 @@ const Index: React.FC = () => {
     setSelectedProjectId(id);
   }, []);
 
-  // --- Placeholder Add Functions ---
   const handleAddWorkspace = () => {
     const newWorkspaceName = prompt("Enter new workspace name:");
     if (newWorkspaceName?.trim()) {
         const newWorkspace: Workspace = { id: uuidv4(), name: newWorkspaceName.trim() };
         setWorkspaces(prev => [...prev, newWorkspace]);
-        setSelectedWorkspaceId(newWorkspace.id); // Select the new workspace
-        setSelectedProjectId(null); // Reset project selection
+        setSelectedWorkspaceId(newWorkspace.id);
+        setSelectedProjectId(null);
         toast.success(`Workspace "${newWorkspace.name}" created.`);
-    } else if (newWorkspaceName !== null) { // Handle empty input but not cancel
+    } else if (newWorkspaceName !== null) {
         toast.error("Workspace name cannot be empty.");
     }
   };
@@ -76,19 +71,18 @@ const Index: React.FC = () => {
      if (newProjectName?.trim()) {
         const newProject: Project = { id: uuidv4(), name: newProjectName.trim(), workspaceId: selectedWorkspaceId };
         setProjects(prev => [...prev, newProject]);
-        setSelectedProjectId(newProject.id); // Select the new project
+        setSelectedProjectId(newProject.id);
         toast.success(`Project "${newProject.name}" created.`);
     } else if (newProjectName !== null) {
         toast.error("Project name cannot be empty.");
     }
   };
-  // --- End Placeholder Add Functions ---
 
   const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add issue without selected project and workspace");
         toast.error("Internal error: Project or Workspace not selected.");
-        return; // Should not happen if dialog is opened correctly
+        return;
     }
     const newIssue: Issue = {
       ...newIssueData,
@@ -98,7 +92,6 @@ const Index: React.FC = () => {
       workspaceId: selectedWorkspaceId,
     };
     setIssues(prev => [...prev, newIssue]);
-    // Toast is handled in the dialog component
   };
 
 
@@ -115,18 +108,17 @@ const Index: React.FC = () => {
     />
   );
 
+  // Main content now only needs the IssueList (or other main view components)
   const mainContent = (
-    <div className="w-full h-full flex flex-col">
-        <IssueList
-            issues={issues}
-            projectId={selectedProjectId}
-            onAddIssue={() => setIsAddIssueDialogOpen(true)} // Open dialog on button click
-        />
-        {/* Add other main content components here */}
-    </div>
+    <IssueList
+        issues={issues}
+        projectId={selectedProjectId}
+        onAddIssue={() => setIsAddIssueDialogOpen(true)}
+    />
   );
 
   return (
+    // Layout component wraps everything
     <>
         <Layout sidebar={sidebarContent}>
             {mainContent}
