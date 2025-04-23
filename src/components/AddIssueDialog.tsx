@@ -7,18 +7,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Issue, IssueStatus, IssueType } from '@/types';
-import { toast } from "sonner"; // Using sonner for toasts
+import { Issue, IssueStatus, IssueType, Attachment } from '@/types'; // Import Attachment
+import { toast } from "sonner";
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for attachment IDs
 
 interface AddIssueDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  // Update prop type to include attachments
   onAddIssue: (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => void;
   projectId: string | null;
   workspaceId: string | null;
@@ -32,8 +33,11 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
   const [description, setDescription] = useState('');
   const [type, setType] = useState<IssueType>('Bug');
   const [status, setStatus] = useState<IssueStatus>('ToDo');
-  // Add state for file uploads later
-  // const [files, setFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null); // State for selected files
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFiles(event.target.files);
+  };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -46,11 +50,27 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
         return;
     }
 
+    // Prepare attachments array
+    const attachments: Attachment[] = [];
+    if (selectedFiles) {
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            attachments.push({
+                id: uuidv4(),
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                file: file, // Store the File object
+            });
+        }
+    }
+
     onAddIssue({
       title,
       description,
       type,
       status,
+      attachments: attachments.length > 0 ? attachments : undefined, // Add attachments
     });
 
     // Reset form and close dialog
@@ -58,13 +78,19 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
     setDescription('');
     setType('Bug');
     setStatus('ToDo');
+    setSelectedFiles(null); // Reset file input state
+    // Clear the file input visually (find the input and reset its value)
+    const fileInput = document.getElementById('attachments') as HTMLInputElement;
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
     onOpenChange(false);
     toast.success("Issue added successfully!");
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      {/* Trigger is handled externally */}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Issue</DialogTitle>
@@ -136,13 +162,30 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
                </Select>
             </div>
 
-            {/* File Upload Placeholder */}
-            {/* <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="files" className="text-right">
+            {/* File Upload */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="attachments" className="text-right">
                 Attachments
               </Label>
-              <Input id="files" type="file" multiple className="col-span-3" />
-            </div> */}
+              <Input
+                id="attachments"
+                type="file"
+                multiple
+                className="col-span-3"
+                onChange={handleFileChange} // Add onChange handler
+              />
+            </div>
+             {/* Display selected file names (optional) */}
+             {selectedFiles && selectedFiles.length > 0 && (
+                <div className="col-span-4 grid grid-cols-4 items-start gap-4">
+                    <div className="col-start-2 col-span-3 text-xs text-muted-foreground space-y-1">
+                        <p className="font-medium">Selected files:</p>
+                        {Array.from(selectedFiles).map((file, index) => (
+                            <p key={index} className="truncate">{file.name}</p>
+                        ))}
+                    </div>
+                </div>
+             )}
 
           </div>
           <DialogFooter>

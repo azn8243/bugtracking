@@ -3,14 +3,14 @@ import Layout from '@/components/Layout';
 import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
 import AddIssueDialog from '@/components/AddIssueDialog';
-import BulkAddIssuesDialog from '@/components/BulkAddIssuesDialog'; // Import bulk add dialog
+import BulkAddIssuesDialog from '@/components/BulkAddIssuesDialog';
 import ConfirmationDialog from '@/components/ConfirmationDialog';
-import { Workspace, Project, Issue, IssueType, IssueStatus } from '@/types'; // Import types
+import { Workspace, Project, Issue, IssueType, IssueStatus, Attachment } from '@/types'; // Import Attachment
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 
-// Sample Data (keep as is)
+// Sample Data - Add empty attachments array to existing issues
 const initialWorkspaces: Workspace[] = [
   { id: 'ws1', name: 'Personal Workspace' },
   { id: 'ws2', name: 'Team Alpha' },
@@ -21,11 +21,11 @@ const initialProjects: Project[] = [
   { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
 ];
 const initialIssues: Issue[] = [
-  { id: uuidv4(), title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
-  { id: uuidv4(), title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
+  { id: uuidv4(), title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
+  { id: uuidv4(), title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
+  { id: uuidv4(), title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date(), attachments: [] },
+  { id: uuidv4(), title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), attachments: [] },
+  { id: uuidv4(), title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), attachments: [] },
 ];
 
 type DeletionTarget =
@@ -47,7 +47,7 @@ const Index: React.FC = () => {
   });
 
   const [isAddIssueDialogOpen, setIsAddIssueDialogOpen] = useState(false);
-  const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false); // State for bulk add dialog
+  const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
   const [deletionTarget, setDeletionTarget] = useState<DeletionTarget>(null);
 
   // --- Derived State for Names ---
@@ -100,7 +100,7 @@ const Index: React.FC = () => {
     }
   };
 
-  // Single Issue Add
+  // Single Issue Add - Updated to handle attachments
   const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add issue without selected project and workspace");
@@ -108,16 +108,18 @@ const Index: React.FC = () => {
         return;
     }
     const newIssue: Issue = {
-      ...newIssueData,
+      ...newIssueData, // Includes title, description, type, status, attachments?
       id: uuidv4(),
       createdAt: new Date(),
       projectId: selectedProjectId,
       workspaceId: selectedWorkspaceId,
+      // Ensure attachments is an array, even if undefined from dialog
+      attachments: newIssueData.attachments ?? [],
     };
     setIssues(prev => [...prev, newIssue]);
   };
 
-  // Bulk Issue Add
+  // Bulk Issue Add - Initialize with empty attachments
   const handleAddBulkIssues = (titles: string[]) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add bulk issues without selected project and workspace");
@@ -127,26 +129,25 @@ const Index: React.FC = () => {
     const newIssues: Issue[] = titles.map(title => ({
         id: uuidv4(),
         title: title,
-        description: '', // Default empty description
-        type: 'Task',    // Default type
-        status: 'ToDo',  // Default status
+        description: '',
+        type: 'Task',
+        status: 'ToDo',
         projectId: selectedProjectId!,
         workspaceId: selectedWorkspaceId!,
         createdAt: new Date(),
+        attachments: [], // Initialize with empty attachments
     }));
     setIssues(prev => [...prev, ...newIssues]);
-    // Toast is handled in the dialog
   };
 
   // --- Update Handler ---
+  // Note: This doesn't handle updating attachments yet.
   const handleUpdateIssue = (id: string, field: 'type' | 'status', value: IssueType | IssueStatus) => {
     setIssues(prevIssues =>
         prevIssues.map(issue =>
             issue.id === id ? { ...issue, [field]: value } : issue
         )
     );
-    // Optional: Add toast notification for update
-    // toast.success(`Issue ${field} updated.`);
   };
 
 
@@ -217,6 +218,7 @@ const Index: React.FC = () => {
             Type: issue.type,
             Status: issue.status,
             Created: issue.createdAt.toISOString(),
+            Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '', // Add attachment names
         }));
     if (issuesToExport.length === 0) {
         toast.info("No issues to export in this project.");
@@ -256,11 +258,11 @@ const Index: React.FC = () => {
         projectId={selectedProjectId}
         workspaceName={selectedWorkspaceName}
         projectName={selectedProjectName}
-        onAddIssue={() => setIsAddIssueDialogOpen(true)} // Open single add
-        onAddBulkIssues={() => setIsBulkAddDialogOpen(true)} // Open bulk add
+        onAddIssue={() => setIsAddIssueDialogOpen(true)}
+        onAddBulkIssues={() => setIsBulkAddDialogOpen(true)}
         onDeleteIssue={requestDeleteIssue}
         onExportIssues={handleExportIssues}
-        onUpdateIssue={handleUpdateIssue} // Pass update handler
+        onUpdateIssue={handleUpdateIssue}
     />
   );
 
@@ -290,7 +292,7 @@ const Index: React.FC = () => {
             onOpenChange={(open) => !open && setDeletionTarget(null)}
             onConfirm={confirmDeletion}
             title={`Delete ${deletionTarget?.type ?? ''}?`}
-            description={ /* Description logic remains the same */
+            description={
                 deletionTarget?.type === 'workspace'
                 ? `Are you sure you want to delete the workspace "${deletionTarget.name}"? This will also delete all projects and issues within it. This action cannot be undone.`
                 : deletionTarget?.type === 'project'
