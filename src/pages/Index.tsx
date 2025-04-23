@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
 
-// Sample Data - Add empty attachments array to existing issues
+// Sample Data - Add empty attachments array for consistency
 const initialWorkspaces: Workspace[] = [
   { id: 'ws1', name: 'Personal Workspace' },
   { id: 'ws2', name: 'Team Alpha' },
@@ -100,7 +100,7 @@ const Index: React.FC = () => {
     }
   };
 
-  // Single Issue Add - Updated to handle attachments
+  // Single Issue Add - Now includes attachments
   const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add issue without selected project and workspace");
@@ -108,18 +108,19 @@ const Index: React.FC = () => {
         return;
     }
     const newIssue: Issue = {
-      ...newIssueData, // Includes title, description, type, status, attachments?
+      ...newIssueData, // Spread the data including title, description, type, status, attachments?
       id: uuidv4(),
       createdAt: new Date(),
       projectId: selectedProjectId,
       workspaceId: selectedWorkspaceId,
-      // Ensure attachments is an array, even if undefined from dialog
+      // Ensure attachments is at least an empty array if not provided
       attachments: newIssueData.attachments ?? [],
     };
     setIssues(prev => [...prev, newIssue]);
+    // Toast is handled in the dialog
   };
 
-  // Bulk Issue Add - Initialize with empty attachments
+  // Bulk Issue Add - Default attachments to empty array
   const handleAddBulkIssues = (titles: string[]) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add bulk issues without selected project and workspace");
@@ -135,13 +136,13 @@ const Index: React.FC = () => {
         projectId: selectedProjectId!,
         workspaceId: selectedWorkspaceId!,
         createdAt: new Date(),
-        attachments: [], // Initialize with empty attachments
+        attachments: [], // Default to empty array for bulk add
     }));
     setIssues(prev => [...prev, ...newIssues]);
+    // Toast is handled in the dialog
   };
 
   // --- Update Handler ---
-  // Note: This doesn't handle updating attachments yet.
   const handleUpdateIssue = (id: string, field: 'type' | 'status', value: IssueType | IssueStatus) => {
     setIssues(prevIssues =>
         prevIssues.map(issue =>

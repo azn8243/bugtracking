@@ -55,6 +55,11 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
     if (selectedFiles) {
         for (let i = 0; i < selectedFiles.length; i++) {
             const file = selectedFiles[i];
+            // Basic size check (e.g., 10MB limit) - adjust as needed
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error(`File "${file.name}" is too large (max 10MB).`);
+                continue; // Skip this file
+            }
             attachments.push({
                 id: uuidv4(),
                 name: file.name,
@@ -70,7 +75,7 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
       description,
       type,
       status,
-      attachments: attachments.length > 0 ? attachments : undefined, // Add attachments
+      attachments: attachments.length > 0 ? attachments : undefined, // Add attachments if any were valid
     });
 
     // Reset form and close dialog
@@ -168,20 +173,20 @@ const AddIssueDialog: React.FC<AddIssueDialogProps> = ({ isOpen, onOpenChange, o
                 Attachments
               </Label>
               <Input
-                id="attachments"
+                id="attachments" // Ensure ID matches the reset logic in handleSubmit
                 type="file"
                 multiple
-                className="col-span-3"
+                className="col-span-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                 onChange={handleFileChange} // Add onChange handler
               />
             </div>
              {/* Display selected file names (optional) */}
              {selectedFiles && selectedFiles.length > 0 && (
                 <div className="col-span-4 grid grid-cols-4 items-start gap-4">
-                    <div className="col-start-2 col-span-3 text-xs text-muted-foreground space-y-1">
+                    <div className="col-start-2 col-span-3 text-xs text-muted-foreground space-y-1 max-h-20 overflow-y-auto"> {/* Limit height and add scroll */}
                         <p className="font-medium">Selected files:</p>
                         {Array.from(selectedFiles).map((file, index) => (
-                            <p key={index} className="truncate">{file.name}</p>
+                            <p key={index} className="truncate">{file.name} ({ (file.size / 1024).toFixed(1) } KB)</p>
                         ))}
                     </div>
                 </div>
