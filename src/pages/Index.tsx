@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useMemo } from 'react'; // Added useMemo
+import React, { useState, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
 import AddIssueDialog from '@/components/AddIssueDialog';
+import BulkAddIssuesDialog from '@/components/BulkAddIssuesDialog'; // Import bulk add dialog
 import ConfirmationDialog from '@/components/ConfirmationDialog';
-import { Workspace, Project, Issue } from '@/types';
+import { Workspace, Project, Issue, IssueType, IssueStatus } from '@/types'; // Import types
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
@@ -46,6 +47,7 @@ const Index: React.FC = () => {
   });
 
   const [isAddIssueDialogOpen, setIsAddIssueDialogOpen] = useState(false);
+  const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false); // State for bulk add dialog
   const [deletionTarget, setDeletionTarget] = useState<DeletionTarget>(null);
 
   // --- Derived State for Names ---
@@ -98,6 +100,7 @@ const Index: React.FC = () => {
     }
   };
 
+  // Single Issue Add
   const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'projectId' | 'workspaceId'>) => {
      if (!selectedProjectId || !selectedWorkspaceId) {
         console.error("Cannot add issue without selected project and workspace");
@@ -113,6 +116,39 @@ const Index: React.FC = () => {
     };
     setIssues(prev => [...prev, newIssue]);
   };
+
+  // Bulk Issue Add
+  const handleAddBulkIssues = (titles: string[]) => {
+     if (!selectedProjectId || !selectedWorkspaceId) {
+        console.error("Cannot add bulk issues without selected project and workspace");
+        toast.error("Internal error: Project or Workspace not selected.");
+        return;
+    }
+    const newIssues: Issue[] = titles.map(title => ({
+        id: uuidv4(),
+        title: title,
+        description: '', // Default empty description
+        type: 'Task',    // Default type
+        status: 'ToDo',  // Default status
+        projectId: selectedProjectId!,
+        workspaceId: selectedWorkspaceId!,
+        createdAt: new Date(),
+    }));
+    setIssues(prev => [...prev, ...newIssues]);
+    // Toast is handled in the dialog
+  };
+
+  // --- Update Handler ---
+  const handleUpdateIssue = (id: string, field: 'type' | 'status', value: IssueType | IssueStatus) => {
+    setIssues(prevIssues =>
+        prevIssues.map(issue =>
+            issue.id === id ? { ...issue, [field]: value } : issue
+        )
+    );
+    // Optional: Add toast notification for update
+    // toast.success(`Issue ${field} updated.`);
+  };
+
 
   // --- Delete Handlers ---
   const requestDeleteWorkspace = (id: string) => {
@@ -138,7 +174,6 @@ const Index: React.FC = () => {
 
   const confirmDeletion = () => {
     if (!deletionTarget) return;
-
     const { type, id, name } = deletionTarget;
 
     if (type === 'workspace') {
@@ -148,9 +183,8 @@ const Index: React.FC = () => {
         setWorkspaces(prev => prev.filter(ws => ws.id !== id));
         toast.success(`Workspace "${name}" and its contents deleted.`);
         if (selectedWorkspaceId === id) {
-            const nextWorkspace = workspaces.find(ws => ws.id !== id); // Find any other workspace
+            const nextWorkspace = workspaces.find(ws => ws.id !== id);
             setSelectedWorkspaceId(nextWorkspace?.id ?? null);
-            // Re-calculate the project based on the new workspace
             const firstProjectInNextWorkspace = projects.find(p => p.workspaceId === nextWorkspace?.id);
             setSelectedProjectId(firstProjectInNextWorkspace?.id ?? null);
         }
@@ -159,23 +193,21 @@ const Index: React.FC = () => {
         setProjects(prev => prev.filter(p => p.id !== id));
         toast.success(`Project "${name}" and its issues deleted.`);
         if (selectedProjectId === id) {
-             setSelectedProjectId(null); // Just reset project, keep workspace
+             setSelectedProjectId(null);
         }
     } else if (type === 'issue') {
         setIssues(prev => prev.filter(i => i.id !== id));
         toast.success(`Issue "${name}" deleted.`);
     }
-
     setDeletionTarget(null);
   };
 
   // --- Export Handler ---
   const handleExportIssues = (format: 'csv') => {
-    if (!selectedProjectId || !selectedProjectName) { // Check name too
+    if (!selectedProjectId || !selectedProjectName) {
         toast.error("Please select a project to export issues.");
         return;
     }
-
     const issuesToExport = issues
         .filter(issue => issue.projectId === selectedProjectId)
         .map(issue => ({
@@ -186,12 +218,10 @@ const Index: React.FC = () => {
             Status: issue.status,
             Created: issue.createdAt.toISOString(),
         }));
-
     if (issuesToExport.length === 0) {
         toast.info("No issues to export in this project.");
         return;
     }
-
     if (format === 'csv') {
         const worksheet = XLSX.utils.json_to_sheet(issuesToExport);
         const workbook = XLSX.utils.book_new();
@@ -224,11 +254,13 @@ const Index: React.FC = () => {
     <IssueList
         issues={issues}
         projectId={selectedProjectId}
-        workspaceName={selectedWorkspaceName} // Pass name
-        projectName={selectedProjectName}   // Pass name
-        onAddIssue={() => setIsAddIssueDialogOpen(true)}
+        workspaceName={selectedWorkspaceName}
+        projectName={selectedProjectName}
+        onAddIssue={() => setIsAddIssueDialogOpen(true)} // Open single add
+        onAddBulkIssues={() => setIsBulkAddDialogOpen(true)} // Open bulk add
         onDeleteIssue={requestDeleteIssue}
         onExportIssues={handleExportIssues}
+        onUpdateIssue={handleUpdateIssue} // Pass update handler
     />
   );
 
@@ -237,6 +269,7 @@ const Index: React.FC = () => {
         <Layout sidebar={sidebarContent}>
             {mainContent}
         </Layout>
+        {/* Single Add Dialog */}
         <AddIssueDialog
             isOpen={isAddIssueDialogOpen}
             onOpenChange={setIsAddIssueDialogOpen}
@@ -244,13 +277,20 @@ const Index: React.FC = () => {
             projectId={selectedProjectId}
             workspaceId={selectedWorkspaceId}
         />
+        {/* Bulk Add Dialog */}
+        <BulkAddIssuesDialog
+            isOpen={isBulkAddDialogOpen}
+            onOpenChange={setIsBulkAddDialogOpen}
+            onAddBulkIssues={handleAddBulkIssues}
+            projectId={selectedProjectId}
+        />
         {/* Confirmation Dialog */}
         <ConfirmationDialog
             isOpen={!!deletionTarget}
             onOpenChange={(open) => !open && setDeletionTarget(null)}
             onConfirm={confirmDeletion}
             title={`Delete ${deletionTarget?.type ?? ''}?`}
-            description={
+            description={ /* Description logic remains the same */
                 deletionTarget?.type === 'workspace'
                 ? `Are you sure you want to delete the workspace "${deletionTarget.name}"? This will also delete all projects and issues within it. This action cannot be undone.`
                 : deletionTarget?.type === 'project'
