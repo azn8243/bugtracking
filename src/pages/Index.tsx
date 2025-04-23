@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react'; // Added useMemo
 import Layout from '@/components/Layout';
 import Sidebar from '@/components/Sidebar';
 import IssueList from '@/components/IssueList';
 import AddIssueDialog from '@/components/AddIssueDialog';
+import ConfirmationDialog from '@/components/ConfirmationDialog';
 import { Workspace, Project, Issue } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 
 // Sample Data (keep as is)
 const initialWorkspaces: Workspace[] = [
@@ -18,12 +20,18 @@ const initialProjects: Project[] = [
   { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
 ];
 const initialIssues: Issue[] = [
-  { id: uuidv4(), title: 'Button not working on login page', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Implement user authentication', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Design new landing page mockups', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date() },
-  { id: uuidv4(), title: 'Setup database schema', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
-  { id: uuidv4(), title: 'Define API endpoints for user profiles', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
+  { id: uuidv4(), title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date() },
+  { id: uuidv4(), title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
+  { id: uuidv4(), title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date() },
 ];
+
+type DeletionTarget =
+  | { type: 'workspace'; id: string; name: string }
+  | { type: 'project'; id: string; name: string }
+  | { type: 'issue'; id: string; name: string }
+  | null;
 
 
 const Index: React.FC = () => {
@@ -38,7 +46,18 @@ const Index: React.FC = () => {
   });
 
   const [isAddIssueDialogOpen, setIsAddIssueDialogOpen] = useState(false);
+  const [deletionTarget, setDeletionTarget] = useState<DeletionTarget>(null);
 
+  // --- Derived State for Names ---
+  const selectedWorkspaceName = useMemo(() => {
+    return workspaces.find(ws => ws.id === selectedWorkspaceId)?.name ?? null;
+  }, [workspaces, selectedWorkspaceId]);
+
+  const selectedProjectName = useMemo(() => {
+    return projects.find(p => p.id === selectedProjectId)?.name ?? null;
+  }, [projects, selectedProjectId]);
+
+  // --- Selection Handlers ---
   const handleSelectWorkspace = useCallback((id: string) => {
     setSelectedWorkspaceId(id);
     const firstProjectInWorkspace = projects.find(p => p.workspaceId === id);
@@ -49,6 +68,7 @@ const Index: React.FC = () => {
     setSelectedProjectId(id);
   }, []);
 
+  // --- Add Handlers ---
   const handleAddWorkspace = () => {
     const newWorkspaceName = prompt("Enter new workspace name:");
     if (newWorkspaceName?.trim()) {
@@ -94,7 +114,97 @@ const Index: React.FC = () => {
     setIssues(prev => [...prev, newIssue]);
   };
 
+  // --- Delete Handlers ---
+  const requestDeleteWorkspace = (id: string) => {
+    const workspace = workspaces.find(ws => ws.id === id);
+    if (workspace) {
+        setDeletionTarget({ type: 'workspace', id, name: workspace.name });
+    }
+  };
 
+  const requestDeleteProject = (id: string) => {
+    const project = projects.find(p => p.id === id);
+    if (project) {
+        setDeletionTarget({ type: 'project', id, name: project.name });
+    }
+  };
+
+  const requestDeleteIssue = (id: string) => {
+     const issue = issues.find(i => i.id === id);
+     if (issue) {
+        setDeletionTarget({ type: 'issue', id, name: issue.title });
+     }
+  };
+
+  const confirmDeletion = () => {
+    if (!deletionTarget) return;
+
+    const { type, id, name } = deletionTarget;
+
+    if (type === 'workspace') {
+        const projectsToDelete = projects.filter(p => p.workspaceId === id).map(p => p.id);
+        setIssues(prev => prev.filter(i => !projectsToDelete.includes(i.projectId)));
+        setProjects(prev => prev.filter(p => p.workspaceId !== id));
+        setWorkspaces(prev => prev.filter(ws => ws.id !== id));
+        toast.success(`Workspace "${name}" and its contents deleted.`);
+        if (selectedWorkspaceId === id) {
+            const nextWorkspace = workspaces.find(ws => ws.id !== id); // Find any other workspace
+            setSelectedWorkspaceId(nextWorkspace?.id ?? null);
+            // Re-calculate the project based on the new workspace
+            const firstProjectInNextWorkspace = projects.find(p => p.workspaceId === nextWorkspace?.id);
+            setSelectedProjectId(firstProjectInNextWorkspace?.id ?? null);
+        }
+    } else if (type === 'project') {
+        setIssues(prev => prev.filter(i => i.projectId !== id));
+        setProjects(prev => prev.filter(p => p.id !== id));
+        toast.success(`Project "${name}" and its issues deleted.`);
+        if (selectedProjectId === id) {
+             setSelectedProjectId(null); // Just reset project, keep workspace
+        }
+    } else if (type === 'issue') {
+        setIssues(prev => prev.filter(i => i.id !== id));
+        toast.success(`Issue "${name}" deleted.`);
+    }
+
+    setDeletionTarget(null);
+  };
+
+  // --- Export Handler ---
+  const handleExportIssues = (format: 'csv') => {
+    if (!selectedProjectId || !selectedProjectName) { // Check name too
+        toast.error("Please select a project to export issues.");
+        return;
+    }
+
+    const issuesToExport = issues
+        .filter(issue => issue.projectId === selectedProjectId)
+        .map(issue => ({
+            ID: issue.id,
+            Title: issue.title,
+            Description: issue.description ?? '',
+            Type: issue.type,
+            Status: issue.status,
+            Created: issue.createdAt.toISOString(),
+        }));
+
+    if (issuesToExport.length === 0) {
+        toast.info("No issues to export in this project.");
+        return;
+    }
+
+    if (format === 'csv') {
+        const worksheet = XLSX.utils.json_to_sheet(issuesToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Issues");
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `${selectedProjectName.replace(/ /g, '_')}_Issues_${dateStr}.xlsx`;
+        XLSX.writeFile(workbook, filename);
+        toast.success(`Issues exported to ${filename}`);
+    }
+  };
+
+
+  // --- Render ---
   const sidebarContent = (
     <Sidebar
       workspaces={workspaces}
@@ -105,20 +215,24 @@ const Index: React.FC = () => {
       onSelectProject={handleSelectProject}
       onAddWorkspace={handleAddWorkspace}
       onAddProject={handleAddProject}
+      onDeleteWorkspace={requestDeleteWorkspace}
+      onDeleteProject={requestDeleteProject}
     />
   );
 
-  // Main content now only needs the IssueList (or other main view components)
   const mainContent = (
     <IssueList
         issues={issues}
         projectId={selectedProjectId}
+        workspaceName={selectedWorkspaceName} // Pass name
+        projectName={selectedProjectName}   // Pass name
         onAddIssue={() => setIsAddIssueDialogOpen(true)}
+        onDeleteIssue={requestDeleteIssue}
+        onExportIssues={handleExportIssues}
     />
   );
 
   return (
-    // Layout component wraps everything
     <>
         <Layout sidebar={sidebarContent}>
             {mainContent}
@@ -129,6 +243,20 @@ const Index: React.FC = () => {
             onAddIssue={handleAddIssue}
             projectId={selectedProjectId}
             workspaceId={selectedWorkspaceId}
+        />
+        {/* Confirmation Dialog */}
+        <ConfirmationDialog
+            isOpen={!!deletionTarget}
+            onOpenChange={(open) => !open && setDeletionTarget(null)}
+            onConfirm={confirmDeletion}
+            title={`Delete ${deletionTarget?.type ?? ''}?`}
+            description={
+                deletionTarget?.type === 'workspace'
+                ? `Are you sure you want to delete the workspace "${deletionTarget.name}"? This will also delete all projects and issues within it. This action cannot be undone.`
+                : deletionTarget?.type === 'project'
+                ? `Are you sure you want to delete the project "${deletionTarget.name}"? This will also delete all issues within it. This action cannot be undone.`
+                : `Are you sure you want to delete the issue "${deletionTarget?.name ?? ''}"? This action cannot be undone.`
+            }
         />
     </>
   );

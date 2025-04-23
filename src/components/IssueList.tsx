@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Trash2, FileDown } from 'lucide-react'; // Import icons
+import { PlusCircle, Trash2, FileDown, ChevronRight } from 'lucide-react'; // Import icons
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,21 +16,25 @@ import { MoreHorizontal } from 'lucide-react';
 interface IssueListProps {
   issues: Issue[];
   projectId: string | null;
+  workspaceName: string | null; // Add workspace name
+  projectName: string | null;   // Add project name
   onAddIssue: () => void;
-  onDeleteIssue: (id: string) => void; // Add delete handler
-  onExportIssues: (format: 'csv') => void; // Add export handler
+  onDeleteIssue: (id: string) => void;
+  onExportIssues: (format: 'csv') => void;
 }
 
 const IssueList: React.FC<IssueListProps> = ({
     issues,
     projectId,
+    workspaceName, // Destructure names
+    projectName,   // Destructure names
     onAddIssue,
-    onDeleteIssue, // Destructure handlers
-    onExportIssues // Destructure handlers
+    onDeleteIssue,
+    onExportIssues
 }) => {
   if (!projectId) {
     return (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm bg-background">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm bg-background h-full"> {/* Added h-full */}
             <div className="flex flex-col items-center gap-1 text-center">
                 <h3 className="text-2xl font-bold tracking-tight">No Project Selected</h3>
                 <p className="text-sm text-muted-foreground">
@@ -44,9 +48,26 @@ const IssueList: React.FC<IssueListProps> = ({
   const filteredIssues = issues.filter(issue => issue.projectId === projectId);
 
   return (
-    <Card className="w-full flex-1 flex flex-col">
+    // Added min-h-0 to prevent flexbox overflow issues with table
+    <Card className="w-full flex-1 flex flex-col min-h-0">
        <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Issues</CardTitle>
+        {/* Breadcrumbs and Title */}
+        <div className="flex items-center space-x-2">
+            {workspaceName && (
+                <span className="text-muted-foreground text-sm">{workspaceName}</span>
+            )}
+            {workspaceName && projectName && (
+                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+            {projectName && (
+                <span className="text-muted-foreground text-sm">{projectName}</span>
+            )}
+             {projectName && (
+                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+            <CardTitle className="text-lg">Issues</CardTitle> {/* Slightly smaller title */}
+        </div>
+        {/* Action Buttons */}
         <div className="flex items-center space-x-2">
             <Button onClick={() => onExportIssues('csv')} variant="outline" size="sm" disabled={filteredIssues.length === 0}>
                 <FileDown className="mr-2 h-4 w-4" /> Export CSV
@@ -56,6 +77,7 @@ const IssueList: React.FC<IssueListProps> = ({
             </Button>
         </div>
       </CardHeader>
+      {/* Added overflow-auto directly to CardContent */}
       <CardContent className="flex-1 overflow-auto">
         {filteredIssues.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-full">
@@ -75,7 +97,7 @@ const IssueList: React.FC<IssueListProps> = ({
                 <TableHead className="w-[100px]">Type</TableHead>
                 <TableHead className="w-[120px]">Status</TableHead>
                 <TableHead className="w-[120px]">Created</TableHead>
-                <TableHead className="w-[50px] text-right">Actions</TableHead> {/* Actions column */}
+                <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -101,7 +123,6 @@ const IssueList: React.FC<IssueListProps> = ({
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{issue.createdAt.toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                     {/* Actions Dropdown */}
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -110,7 +131,6 @@ const IssueList: React.FC<IssueListProps> = ({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            {/* <DropdownMenuItem>Edit</DropdownMenuItem> */}
                             <DropdownMenuItem
                                 onClick={() => onDeleteIssue(issue.id)}
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
