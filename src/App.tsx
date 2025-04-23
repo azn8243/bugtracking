@@ -224,7 +224,8 @@ const App = () => {
                   onDeleteProject={handleDeleteProject}
                   onAddIssue={handleAddIssue}
                   onAddBulkIssues={handleAddBulkIssues}
-                  onUpdateIssue={handleUpdateIssue} // Pass only the relevant part for inline editing
+                  // Pass the specific update handler needed by Index/IssueList
+                  onUpdateIssue={(id, updates) => handleUpdateIssue(id, updates)}
                   onDeleteIssue={handleDeleteIssue}
                   onExportIssues={handleExportIssues}
                 />
