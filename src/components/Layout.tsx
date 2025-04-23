@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; // Add explicit React import
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 interface LayoutProps {
