@@ -1,14 +1,12 @@
 export type IssueType = 'Epic' | 'Story' | 'Task' | 'Bug';
 export type IssueStatus = 'ToDo' | 'InProgress' | 'Done' | 'Blocked';
 
-// Define the Attachment type
 export interface Attachment {
-  id: string;       // Unique ID for the attachment
-  name: string;     // Original file name
-  type: string;     // MIME type (e.g., 'image/png', 'application/pdf')
-  size: number;     // File size in bytes
-  file: File;       // The actual File object (for local state demo)
-  // url?: string;   // In a real app, you'd store a URL after upload
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  file: File;
 }
 
 export interface Issue {
@@ -20,7 +18,9 @@ export interface Issue {
   projectId: string;
   workspaceId: string;
   createdAt: Date;
-  attachments?: Attachment[]; // Add optional attachments array
+  attachments?: Attachment[];
+  // Add last updated timestamp
+  updatedAt?: Date;
 }
 
 export interface Project {
@@ -32,4 +32,39 @@ export interface Project {
 export interface Workspace {
   id: string;
   name: string;
+}
+
+// --- Activity Log ---
+export type ActivityAction =
+  | 'CREATE_WORKSPACE'
+  | 'DELETE_WORKSPACE'
+  | 'CREATE_PROJECT'
+  | 'DELETE_PROJECT'
+  | 'CREATE_ISSUE'
+  | 'UPDATE_ISSUE_TITLE'
+  | 'UPDATE_ISSUE_DESC'
+  | 'UPDATE_ISSUE_TYPE'
+  | 'UPDATE_ISSUE_STATUS'
+  | 'DELETE_ISSUE'
+  | 'ADD_ATTACHMENT'
+  | 'DELETE_ATTACHMENT';
+
+export interface ActivityLog {
+  id: string;
+  action: ActivityAction;
+  timestamp: Date;
+  userId?: string; // Placeholder for future user tracking
+  userName?: string; // Placeholder
+  details: {
+    workspaceId?: string;
+    workspaceName?: string;
+    projectId?: string;
+    projectName?: string;
+    issueId?: string;
+    issueTitle?: string;
+    attachmentName?: string;
+    oldValue?: string; // For updates
+    newValue?: string; // For updates
+    fieldName?: string; // For updates (e.g., 'status', 'type')
+  };
 }
