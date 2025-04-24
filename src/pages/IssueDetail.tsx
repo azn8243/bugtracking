@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { ChevronLeft, ChevronRight, Trash2, Upload, FileText, X, Save, Edit2, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Upload, FileText, X, Save, Edit2, Check, Mail } from 'lucide-react'; // Added Mail icon
 import ConfirmationDialog from '@/components/ConfirmationDialog'; // Re-use confirmation dialog
 
 // Define options arrays (could also be passed as props)
@@ -51,6 +51,10 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
   // Confirmation dialog state for attachments
   const [attachmentToDelete, setAttachmentToDelete] = useState<Attachment | null>(null);
 
+  // --- State for Email Notification ---
+  const [notifyEmails, setNotifyEmails] = useState('');
+  const [notifyMessage, setNotifyMessage] = useState('');
+
   useEffect(() => {
     if (issueId) {
       const fetchedIssue = getIssueById(issueId);
@@ -61,9 +65,8 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
         setEditableTitle(fetchedIssue.title);
         setEditableDescription(fetchedIssue.description ?? '');
       } else {
-        // Handle issue not found (e.g., navigate to a 404 page or back)
         console.warn(`Issue with ID ${issueId} not found.`);
-        // Optionally navigate away: navigate('/not-found');
+        // navigate('/not-found'); // Optionally navigate away
       }
     }
   }, [issueId, getIssueById, getWorkspaceById, getProjectById, navigate]);
@@ -115,7 +118,6 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
     if (event.target.files && event.target.files.length > 0 && issue) {
       const file = event.target.files[0];
       onAddAttachment(issue.id, file);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -130,12 +132,47 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
     if (attachmentToDelete && issue) {
       onDeleteAttachment(issue.id, attachmentToDelete.id, attachmentToDelete.name);
     }
-    setAttachmentToDelete(null); // Close dialog
+    setAttachmentToDelete(null);
   };
+
+  // --- Email Notification Handler ---
+  const handleGenerateMailto = () => {
+    if (!issue) return;
+    if (!notifyEmails.trim()) {
+        toast.error("Please enter at least one recipient email address.");
+        return;
+    }
+
+    const subject = `Issue Update: [${issue.id.substring(issue.id.lastIndexOf('-') + 1, issue.id.length).substring(0, 6)}] ${issue.title}`;
+    let body = `Hello,\n\nPlease see the details for the following issue:\n\n`;
+    body += `Title: ${issue.title}\n`;
+    body += `Status: ${issue.status}\n`;
+    body += `Type: ${issue.type}\n`;
+    if (project) body += `Project: ${project.name}\n`;
+    if (workspace) body += `Workspace: ${workspace.name}\n`;
+    // Include a link back to the issue detail page
+    body += `Link: ${window.location.href}\n\n`; // Gets the current page URL
+
+    if (notifyMessage.trim()) {
+        body += `Message:\n${notifyMessage.trim()}\n\n`;
+    }
+
+    body += `Regards,\nBug Tracker`;
+
+    // Encode components for the URL
+    const mailtoLink = `mailto:${encodeURIComponent(notifyEmails)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Open the mail client
+    window.location.href = mailtoLink;
+
+    // Optionally clear fields after generating
+    // setNotifyEmails('');
+    // setNotifyMessage('');
+  };
+
 
   // --- Render Logic ---
   if (!issue) {
-    // Optional: Render a loading state or a "Not Found" message
     return (
         <div className="flex flex-col h-screen">
             <Header />
@@ -155,14 +192,14 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
       <div className="flex-1 overflow-y-auto p-6">
         {/* Breadcrumbs & Back Button */}
         <div className="flex items-center justify-between mb-4">
-           <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+           <div className="flex items-center space-x-2 text-sm text-muted-foreground flex-wrap"> {/* Allow wrapping */}
                 <Link to="/" className="hover:text-foreground">Workspaces</Link>
                 {workspace && <ChevronRight className="h-4 w-4" />}
                 {workspace && <span className="hover:text-foreground">{workspace.name}</span>}
                 {project && <ChevronRight className="h-4 w-4" />}
                 {project && <span className="hover:text-foreground">{project.name}</span>}
                 <ChevronRight className="h-4 w-4" />
-                <span className="font-medium text-foreground">{issue.title}</span>
+                <span className="font-medium text-foreground truncate max-w-xs" title={issue.title}>{issue.title}</span> {/* Truncate long titles */}
            </div>
            <Button variant="outline" size="sm" onClick={() => navigate('/')}>
                 <ChevronLeft className="mr-2 h-4 w-4" /> Back to List
@@ -171,7 +208,7 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
 
         {/* Main Content Area */}
         <div className="grid grid-cols-3 gap-6">
-          {/* Left Column: Details & Description */}
+          {/* Left Column: Details, Description, Attachments */}
           <div className="col-span-2 space-y-6">
             {/* Title */}
             <Card>
@@ -228,8 +265,12 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
               </CardHeader>
               <CardContent>
                  {!isEditingDescription ? (
-                    <div className="prose prose-sm max-w-none text-muted-foreground">
-                        {issue.description || <p>No description provided.</p>}
+                    <div className="prose prose-sm max-w-none text-muted-foreground dark:prose-invert"> {/* Added dark:prose-invert */}
+                        {issue.description ? (
+                            <p>{issue.description}</p> // Render simple paragraph if description exists
+                        ) : (
+                            <p>No description provided.</p>
+                        )}
                     </div>
                  ) : (
                     <Textarea
@@ -284,8 +325,9 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
 
           </div>
 
-          {/* Right Column: Metadata */}
+          {/* Right Column: Metadata & Notify */}
           <div className="col-span-1 space-y-6">
+            {/* Details Card */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg">Details</CardTitle>
@@ -332,6 +374,43 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
                      </div>
                 </CardContent>
             </Card>
+
+            {/* Notify Card */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Notify via Email</CardTitle>
+                    <CardDescription>Opens a pre-filled draft in your email client.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="notify-emails">To (comma-separated)</Label>
+                        <Input
+                            id="notify-emails"
+                            type="email"
+                            multiple
+                            placeholder="user1@example.com, user2@example.com"
+                            value={notifyEmails}
+                            onChange={(e) => setNotifyEmails(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="notify-message">Optional Message</Label>
+                        <Textarea
+                            id="notify-message"
+                            placeholder="Add a custom message here..."
+                            rows={3}
+                            value={notifyMessage}
+                            onChange={(e) => setNotifyMessage(e.target.value)}
+                        />
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button onClick={handleGenerateMailto} className="w-full">
+                        <Mail className="mr-2 h-4 w-4" /> Generate Email Draft
+                    </Button>
+                </CardFooter>
+            </Card>
+
           </div>
         </div>
       </div>
