@@ -147,7 +147,19 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
   };
 
   // --- Render Logic ---
-  if (!issue) { return ( /* ... loading/not found ... */ ); }
+  if (!issue) {
+     return (
+        <div className="flex flex-col h-screen">
+            <Header />
+            <div className="flex flex-1 items-center justify-center">
+                <p>Loading issue details or issue not found...</p>
+                 <Button variant="outline" onClick={() => navigate('/')} className="mt-4">
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Back to Issues
+                </Button>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-muted/40">
@@ -203,13 +215,15 @@ const IssueDetail: React.FC<IssueDetailProps> = ({
                     <div className="space-y-1">
                         <Label htmlFor="issue-priority">Priority</Label>
                         <Select value={issue.priority} onValueChange={handlePriorityChange}>
-                            <SelectTrigger id="issue-priority" className={cn("border-0 shadow-none focus:ring-0 focus:ring-offset-0", getPriorityBadgeClass(issue.priority))}>
+                            {/* Apply badge styles directly to the trigger */}
+                            <SelectTrigger id="issue-priority" className={cn("border shadow-none focus:ring-0 focus:ring-offset-0", getPriorityBadgeClass(issue.priority))}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                                 {issuePriorities.map(priority => (
                                     <SelectItem key={priority} value={priority}>
-                                        <Badge variant="outline" className={cn("mr-2 border", getPriorityBadgeClass(priority))}>{priority}</Badge>
+                                        {/* Show badge inside the item for visual consistency */}
+                                        <Badge variant="outline" className={cn("mr-2 border-border", getPriorityBadgeClass(priority))}>{priority}</Badge>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
