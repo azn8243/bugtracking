@@ -176,7 +176,17 @@ const IssueList: React.FC<IssueListProps> = ({
 
   // --- Main Render ---
   if (!projectId && allIssues.length > 0) {
-    return ( /* No Project Selected Message */ );
+    // Display message if no project is selected but issues exist globally
+    return (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm bg-background h-full">
+            <div className="flex flex-col items-center gap-1 text-center">
+                <h3 className="text-2xl font-bold tracking-tight">No Project Selected</h3>
+                <p className="text-sm text-muted-foreground">
+                    Select a project from the sidebar to view its issues.
+                </p>
+            </div>
+        </div>
+     );
   }
 
   const hasActiveFilters = filterTypes.size > 0 || filterStatuses.size > 0 || filterPriorities.size > 0; // Include priority filters
@@ -247,11 +257,19 @@ const IssueList: React.FC<IssueListProps> = ({
          </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto">
-        {processedIssues.length === 0 ? (
+        {/* Check if project is selected before showing table or no issues message */}
+        {!projectId ? (
+             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-full">
+                <div className="flex flex-col items-center gap-1 text-center">
+                    <h3 className="text-xl font-bold tracking-tight">No Project Selected</h3>
+                    <p className="text-sm text-muted-foreground">Select a project to see issues.</p>
+                </div>
+            </div>
+        ) : processedIssues.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed shadow-sm h-full">
              <div className="flex flex-col items-center gap-1 text-center">
                 <h3 className="text-xl font-bold tracking-tight">No Issues Found</h3>
-                <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria.</p>
+                <p className="text-sm text-muted-foreground">Try adjusting your search or filter criteria, or add a new issue.</p>
              </div>
           </div>
         ) : (
@@ -260,8 +278,8 @@ const IssueList: React.FC<IssueListProps> = ({
               <TableRow>
                 <TableHead className="w-[80px]">ID</TableHead>
                 {renderSortableHeader('title', 'Title')}
-                {renderSortableHeader('type', 'Type', 'w-[110px]')} {/* Adjusted width */}
-                {renderSortableHeader('status', 'Status', 'w-[130px]')} {/* Adjusted width */}
+                {renderSortableHeader('type', 'Type', 'w-[110px]')}
+                {renderSortableHeader('status', 'Status', 'w-[130px]')}
                 {renderSortableHeader('priority', 'Priority', 'w-[120px]')} {/* Add Priority Header */}
                 {renderSortableHeader('createdAt', 'Created', 'w-[120px]')}
                 <TableHead className="w-[50px] text-right">Actions</TableHead>
@@ -291,13 +309,15 @@ const IssueList: React.FC<IssueListProps> = ({
                   {/* --- Priority Select & Badge --- */}
                   <TableCell>
                      <Select value={issue.priority} onValueChange={(newPriority) => handlePriorityChange(issue.id, newPriority)}>
-                        <SelectTrigger className={cn("h-8 text-xs px-2 py-1 border-0 shadow-none focus:ring-0 focus:ring-offset-0", getPriorityBadgeClass(issue.priority))}>
+                        {/* Apply badge styles directly to the trigger */}
+                        <SelectTrigger className={cn("h-8 text-xs px-2 py-1 border shadow-none focus:ring-0 focus:ring-offset-0", getPriorityBadgeClass(issue.priority))}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                             {issuePriorities.map(priority => (
                                 <SelectItem key={priority} value={priority} className="text-xs">
-                                    <Badge variant="outline" className={cn("mr-2 border", getPriorityBadgeClass(priority))}>{priority}</Badge>
+                                    {/* Show badge inside the item for visual consistency */}
+                                    <Badge variant="outline" className={cn("mr-2 border-border", getPriorityBadgeClass(priority))}>{priority}</Badge>
                                 </SelectItem>
                             ))}
                         </SelectContent>
