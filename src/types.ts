@@ -1,5 +1,7 @@
 export type IssueType = 'Epic' | 'Story' | 'Task' | 'Bug';
 export type IssueStatus = 'ToDo' | 'InProgress' | 'Done' | 'Blocked';
+// --- Add Priority Type ---
+export type IssuePriority = 'Low' | 'Medium' | 'High';
 
 export interface Attachment {
   id: string;
@@ -15,12 +17,12 @@ export interface Issue {
   description?: string;
   type: IssueType;
   status: IssueStatus;
+  priority: IssuePriority; // Add priority field
   projectId: string;
   workspaceId: string;
   createdAt: Date;
-  attachments?: Attachment[];
-  // Add last updated timestamp
   updatedAt?: Date;
+  attachments?: Attachment[];
 }
 
 export interface Project {
@@ -45,6 +47,7 @@ export type ActivityAction =
   | 'UPDATE_ISSUE_DESC'
   | 'UPDATE_ISSUE_TYPE'
   | 'UPDATE_ISSUE_STATUS'
+  | 'UPDATE_ISSUE_PRIORITY' // Add priority update action
   | 'DELETE_ISSUE'
   | 'ADD_ATTACHMENT'
   | 'DELETE_ATTACHMENT';
@@ -53,8 +56,8 @@ export interface ActivityLog {
   id: string;
   action: ActivityAction;
   timestamp: Date;
-  userId?: string; // Placeholder for future user tracking
-  userName?: string; // Placeholder
+  userId?: string;
+  userName?: string;
   details: {
     workspaceId?: string;
     workspaceName?: string;
@@ -63,8 +66,8 @@ export interface ActivityLog {
     issueId?: string;
     issueTitle?: string;
     attachmentName?: string;
-    oldValue?: string; // For updates
-    newValue?: string; // For updates
-    fieldName?: string; // For updates (e.g., 'status', 'type')
+    oldValue?: string;
+    newValue?: string;
+    fieldName?: string; // e.g., 'status', 'type', 'priority'
   };
 }

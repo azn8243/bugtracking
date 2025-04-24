@@ -6,8 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import IssueDetail from "./pages/IssueDetail";
 import NotFound from "./pages/NotFound";
-// Import ActivityLog type
-import { Workspace, Project, Issue, IssueType, IssueStatus, Attachment, ActivityLog, ActivityAction } from '@/types';
+// Import IssuePriority
+import { Workspace, Project, Issue, IssueType, IssueStatus, IssuePriority, Attachment, ActivityLog, ActivityAction } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import * as XLSX from 'xlsx';
 import { toast } from "sonner";
@@ -24,12 +24,13 @@ const initialProjects: Project[] = [
   { id: 'proj2', name: 'Website Redesign', workspaceId: 'ws1' },
   { id: 'proj3', name: 'API Development', workspaceId: 'ws2' },
 ];
+// Add default priority to initial issues
 const initialIssues: Issue[] = [
-  { id: `issue-${uuidv4()}`, title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
-  { id: `issue-${uuidv4()}`, title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
-  { id: `issue-${uuidv4()}`, title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
-  { id: `issue-${uuidv4()}`, title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
-  { id: `issue-${uuidv4()}`, title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
+  { id: `issue-${uuidv4()}`, title: 'Button not working on login page', description: 'The main login button is unresponsive.', type: 'Bug', status: 'ToDo', priority: 'High', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
+  { id: `issue-${uuidv4()}`, title: 'Implement user authentication', description: 'Setup JWT authentication flow.', type: 'Story', status: 'InProgress', priority: 'Medium', projectId: 'proj1', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
+  { id: `issue-${uuidv4()}`, title: 'Design new landing page mockups', description: '', type: 'Task', status: 'Done', priority: 'Low', projectId: 'proj2', workspaceId: 'ws1', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
+  { id: `issue-${uuidv4()}`, title: 'Setup database schema', description: 'Define tables for users, projects, issues.', type: 'Task', status: 'ToDo', priority: 'Medium', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
+  { id: `issue-${uuidv4()}`, title: 'Define API endpoints for user profiles', description: 'CRUD operations for user data.', type: 'Epic', status: 'ToDo', priority: 'Medium', projectId: 'proj3', workspaceId: 'ws2', createdAt: new Date(), updatedAt: new Date(), attachments: [] },
 ];
 
 
@@ -38,7 +39,6 @@ const App = () => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [issues, setIssues] = useState<Issue[]>(initialIssues);
-  // --- Activity Log State ---
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   // --- Helper Getters ---
@@ -49,16 +49,10 @@ const App = () => {
   // --- Activity Logging Function ---
   const logActivity = (action: ActivityAction, details: ActivityLog['details']) => {
     const newLog: ActivityLog = {
-      id: uuidv4(),
-      action,
-      timestamp: new Date(),
-      // userId: 'user-123', // Add actual user ID later
-      // userName: 'Demo User', // Add actual user name later
-      details,
+      id: uuidv4(), action, timestamp: new Date(), details,
     };
-    // Add to the beginning of the array for newest first
     setActivityLogs(prev => [newLog, ...prev]);
-    console.log("Activity Logged:", newLog); // For debugging
+    console.log("Activity Logged:", newLog);
   };
 
 
@@ -76,12 +70,7 @@ const App = () => {
     const workspace = getWorkspaceById(workspaceId);
     const newProject: Project = { id: uuidv4(), name, workspaceId };
     setProjects(prev => [...prev, newProject]);
-    logActivity('CREATE_PROJECT', {
-        projectId: newProject.id,
-        projectName: newProject.name,
-        workspaceId: workspaceId,
-        workspaceName: workspace?.name
-    });
+    logActivity('CREATE_PROJECT', { projectId: newProject.id, projectName: newProject.name, workspaceId: workspaceId, workspaceName: workspace?.name });
     toast.success(`Project "${name}" created.`);
     return newProject;
   };
@@ -100,37 +89,26 @@ const App = () => {
     const workspace = project ? getWorkspaceById(project.workspaceId) : null;
     setIssues(prev => prev.filter(i => i.projectId !== id));
     setProjects(prev => prev.filter(p => p.id !== id));
-    logActivity('DELETE_PROJECT', {
-        projectId: id,
-        projectName: name,
-        workspaceId: workspace?.id,
-        workspaceName: workspace?.name
-    });
+    logActivity('DELETE_PROJECT', { projectId: id, projectName: name, workspaceId: workspace?.id, workspaceName: workspace?.name });
     toast.success(`Project "${name}" and its issues deleted.`);
   };
 
    const handleAddIssue = (newIssueData: Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!newIssueData.projectId || !newIssueData.workspaceId) {
-        toast.error("Cannot add issue without Project and Workspace ID.");
-        return;
+        toast.error("Cannot add issue without Project and Workspace ID."); return;
     }
     const now = new Date();
     const newIssue: Issue = {
+      priority: 'Medium', // Default priority
       ...newIssueData,
       id: `issue-${uuidv4()}`,
       createdAt: now,
-      updatedAt: now, // Set initial updatedAt
+      updatedAt: now,
       attachments: newIssueData.attachments ?? [],
     };
     setIssues(prev => [...prev, newIssue]);
     const project = getProjectById(newIssue.projectId);
-    logActivity('CREATE_ISSUE', {
-        issueId: newIssue.id,
-        issueTitle: newIssue.title,
-        projectId: newIssue.projectId,
-        projectName: project?.name,
-        workspaceId: newIssue.workspaceId
-    });
+    logActivity('CREATE_ISSUE', { issueId: newIssue.id, issueTitle: newIssue.title, projectId: newIssue.projectId, projectName: project?.name, workspaceId: newIssue.workspaceId });
   };
 
   const handleAddBulkIssues = (titles: string[], projectId: string, workspaceId: string) => {
@@ -142,31 +120,26 @@ const App = () => {
         description: '',
         type: 'Task',
         status: 'ToDo',
+        priority: 'Medium', // Default priority
         projectId: projectId,
         workspaceId: workspaceId,
         createdAt: now,
-        updatedAt: now, // Set initial updatedAt
+        updatedAt: now,
         attachments: [],
     }));
     setIssues(prev => [...prev, ...newIssues]);
-    // Log each bulk added issue individually (or create a specific bulk action)
     newIssues.forEach(issue => {
-        logActivity('CREATE_ISSUE', {
-            issueId: issue.id,
-            issueTitle: issue.title,
-            projectId: issue.projectId,
-            projectName: project?.name,
-            workspaceId: issue.workspaceId
-        });
+        logActivity('CREATE_ISSUE', { issueId: issue.id, issueTitle: issue.title, projectId: issue.projectId, projectName: project?.name, workspaceId: issue.workspaceId });
     });
     toast.success(`${titles.length} issue(s) added successfully!`);
   };
 
-  const handleUpdateIssue = (id: string, updates: Partial<Pick<Issue, 'title' | 'description' | 'type' | 'status'>>) => {
+  // Update handler now includes priority
+  const handleUpdateIssue = (id: string, updates: Partial<Pick<Issue, 'title' | 'description' | 'type' | 'status' | 'priority'>>) => {
     const issueToUpdate = getIssueById(id);
     if (!issueToUpdate) return;
 
-    const updatedIssue = { ...issueToUpdate, ...updates, updatedAt: new Date() }; // Add updatedAt timestamp
+    const updatedIssue = { ...issueToUpdate, ...updates, updatedAt: new Date() };
 
     setIssues(prevIssues =>
         prevIssues.map(issue =>
@@ -184,16 +157,17 @@ const App = () => {
                 case 'description': action = 'UPDATE_ISSUE_DESC'; break;
                 case 'type': action = 'UPDATE_ISSUE_TYPE'; break;
                 case 'status': action = 'UPDATE_ISSUE_STATUS'; break;
+                case 'priority': action = 'UPDATE_ISSUE_PRIORITY'; break; // Log priority change
             }
             if (action) {
                 logActivity(action, {
                     issueId: id,
-                    issueTitle: updatedIssue.title, // Log current title for context
+                    issueTitle: updatedIssue.title,
                     projectId: issueToUpdate.projectId,
                     workspaceId: issueToUpdate.workspaceId,
                     fieldName: key,
-                    oldValue: String(oldValue ?? ''), // Ensure string conversion
-                    newValue: String(newValue ?? ''), // Ensure string conversion
+                    oldValue: String(oldValue ?? ''),
+                    newValue: String(newValue ?? ''),
                 });
             }
         }
@@ -204,41 +178,22 @@ const App = () => {
     const issue = getIssueById(id);
     if (!issue) return;
     setIssues(prev => prev.filter(i => i.id !== id));
-    logActivity('DELETE_ISSUE', {
-        issueId: id,
-        issueTitle: name,
-        projectId: issue.projectId,
-        workspaceId: issue.workspaceId
-    });
+    logActivity('DELETE_ISSUE', { issueId: id, issueTitle: name, projectId: issue.projectId, workspaceId: issue.workspaceId });
     toast.success(`Issue "${name}" deleted.`);
   };
 
   const handleAddAttachment = (issueId: string, file: File) => {
      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`File "${file.name}" is too large (max 10MB).`);
-        return;
+        toast.error(`File "${file.name}" is too large (max 10MB).`); return;
      }
      const issue = getIssueById(issueId);
      if (!issue) return;
-
-     const newAttachment: Attachment = {
-        id: uuidv4(), name: file.name, size: file.size, type: file.type, file: file,
-     };
+     const newAttachment: Attachment = { id: uuidv4(), name: file.name, size: file.size, type: file.type, file: file };
      const now = new Date();
      setIssues(prevIssues =>
-        prevIssues.map(i =>
-            i.id === issueId
-                ? { ...i, attachments: [...(i.attachments ?? []), newAttachment], updatedAt: now } // Update timestamp
-                : i
-        )
+        prevIssues.map(i => i.id === issueId ? { ...i, attachments: [...(i.attachments ?? []), newAttachment], updatedAt: now } : i)
      );
-     logActivity('ADD_ATTACHMENT', {
-         issueId: issueId,
-         issueTitle: issue.title,
-         projectId: issue.projectId,
-         workspaceId: issue.workspaceId,
-         attachmentName: newAttachment.name
-     });
+     logActivity('ADD_ATTACHMENT', { issueId: issueId, issueTitle: issue.title, projectId: issue.projectId, workspaceId: issue.workspaceId, attachmentName: newAttachment.name });
      toast.success(`Attachment "${file.name}" added.`);
   };
 
@@ -247,37 +202,23 @@ const App = () => {
      if (!issue) return;
      const now = new Date();
      setIssues(prevIssues =>
-        prevIssues.map(i =>
-            i.id === issueId
-                ? { ...i, attachments: i.attachments?.filter(att => att.id !== attachmentId) ?? [], updatedAt: now } // Update timestamp
-                : i
-        )
+        prevIssues.map(i => i.id === issueId ? { ...i, attachments: i.attachments?.filter(att => att.id !== attachmentId) ?? [], updatedAt: now } : i)
      );
-     logActivity('DELETE_ATTACHMENT', {
-         issueId: issueId,
-         issueTitle: issue.title,
-         projectId: issue.projectId,
-         workspaceId: issue.workspaceId,
-         attachmentName: attachmentName
-     });
+     logActivity('DELETE_ATTACHMENT', { issueId: issueId, issueTitle: issue.title, projectId: issue.projectId, workspaceId: issue.workspaceId, attachmentName: attachmentName });
      toast.success(`Attachment "${attachmentName}" deleted.`);
   };
 
 
-  // Export Handler (No logging needed for export)
+  // Export Handler - Add Priority column
   const handleExportIssues = (format: 'csv', projectId: string) => {
     const project = getProjectById(projectId);
-    if (!project) {
-        toast.error("Project not found for export."); return;
-    }
+    if (!project) { toast.error("Project not found for export."); return; }
     const issuesToExport = issues
         .filter(issue => issue.projectId === projectId)
         .map(issue => ({
-            ID: issue.id, Title: issue.title, Description: issue.description ?? '', Type: issue.type, Status: issue.status, Created: issue.createdAt.toISOString(), Updated: issue.updatedAt?.toISOString() ?? '', Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '',
+            ID: issue.id, Title: issue.title, Description: issue.description ?? '', Type: issue.type, Status: issue.status, Priority: issue.priority, Created: issue.createdAt.toISOString(), Updated: issue.updatedAt?.toISOString() ?? '', Attachments: issue.attachments?.map(a => a.name).join(', ') ?? '',
         }));
-    if (issuesToExport.length === 0) {
-        toast.info("No issues to export in this project."); return;
-    }
+    if (issuesToExport.length === 0) { toast.info("No issues to export in this project."); return; }
     if (format === 'csv') {
         const worksheet = XLSX.utils.json_to_sheet(issuesToExport);
         const workbook = XLSX.utils.book_new();
@@ -303,8 +244,8 @@ const App = () => {
                   workspaces={workspaces}
                   projects={projects}
                   issues={issues}
-                  activityLogs={activityLogs} // Pass logs down
-                  getWorkspaceById={getWorkspaceById} // Pass getters
+                  activityLogs={activityLogs}
+                  getWorkspaceById={getWorkspaceById}
                   getProjectById={getProjectById}
                   getIssueById={getIssueById}
                   onAddWorkspace={handleAddWorkspace}
@@ -313,6 +254,7 @@ const App = () => {
                   onDeleteProject={handleDeleteProject}
                   onAddIssue={handleAddIssue}
                   onAddBulkIssues={handleAddBulkIssues}
+                  // Pass specific update handler for list view (type, status, priority)
                   onUpdateIssue={(id, updates) => handleUpdateIssue(id, updates)}
                   onDeleteIssue={handleDeleteIssue}
                   onExportIssues={handleExportIssues}
@@ -326,7 +268,7 @@ const App = () => {
                     getIssueById={getIssueById}
                     getWorkspaceById={getWorkspaceById}
                     getProjectById={getProjectById}
-                    onUpdateIssue={handleUpdateIssue}
+                    onUpdateIssue={handleUpdateIssue} // Pass full update handler
                     onAddAttachment={handleAddAttachment}
                     onDeleteAttachment={handleDeleteAttachment}
                  />
